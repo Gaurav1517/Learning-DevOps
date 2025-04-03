@@ -1,0 +1,53 @@
+Error:
+yum update -y
+CentOS Linux 8 - AppStream                                           0.0  B/s |   0  B     00:00
+Errors during downloading metadata for repository 'appstream':
+  - Curl error (6): Couldn't resolve host name for http://vault.centos.org/centos/8/AppStream/x86_64/os/repodata/repomd.xml [Could not resolve host: vault.centos.org]
+Error: Failed to download metadata for repo 'appstream': Cannot download repomd.xml: Cannot download repodata/repomd.xml: All mirrors were tried
+
+
+
+CentOS 8 reached end-of-life (EOL) on December 31, 2021, and its repositories were moved to vault.centos.org, which 
+no longer has DNS resolution by default. You have a few options to fix this issue:
+
+Option 1: Use CentOS Vault (Recommended for EOL CentOS 8)
+You need to update your repository configuration to use the CentOS Vault.
+
+Move the old repository files:
+
+bash
+mkdir -p /etc/yum.repos.d/old-repos
+mv /etc/yum.repos.d/CentOS-* /etc/yum.repos.d/old-repos/
+Create a new repo file:
+
+bash
+
+cat <<EOF > /etc/yum.repos.d/centos-vault.repo
+[BaseOS]
+name=CentOS-8 - Base
+baseurl=http://vault.centos.org/centos/8/BaseOS/x86_64/os/
+gpgcheck=1
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+
+[AppStream]
+name=CentOS-8 - AppStream
+baseurl=http://vault.centos.org/centos/8/AppStream/x86_64/os/
+gpgcheck=1
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+
+[extras]
+name=CentOS-8 - Extras
+baseurl=http://vault.centos.org/centos/8/extras/x86_64/os/
+gpgcheck=1
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+EOF
+Clear the cache and update:
+
+bash
+Edit
+yum clean all
+yum makecache
+yum update -y
