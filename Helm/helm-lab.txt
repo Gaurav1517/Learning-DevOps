@@ -1,0 +1,399 @@
+############### HELM ###############
+REF:
+	https://helm.sh/
+	https://helm.sh/docs/
+
+Helm is a package manger for Kubernetes
+
+Think of it like apt for ubuntu or yum for CentOS  but for Kubernetes. It helps you:
+	Install application easily
+	Manage application version
+	Automate Kubernetes deployment using Helm charts (predefined template)
+ for example, instead of manually creating multiple k8s  YAML files, you can use a Helm chart to deploy an entire app with a single command
+	helm install myapp <<chart-name>>
+
+Helm installation
+
+wget https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz
+ls
+tar -xzvf helm-v3.17.2-linux-amd64.tar.gz
+ls
+To check binary 
+which bash
+# either in /usr/bin OR /bin 
+cp  linux-amd64/helm /usr/bin/helm
+Check helm version
+helm version
+
+
+helm help
+helm --help
+
+Create helm chart
+helm create <chart-name>
+See the file structure of the helm chart with tree command. 
+tree
+.
+└── my-first-chart
+    ├── charts
+    ├── Chart.yaml
+    ├── templates
+    │   ├── deployment.yaml
+    │   ├── _helpers.tpl
+    │   ├── hpa.yaml
+    │   ├── ingress.yaml
+    │   ├── NOTES.txt
+    │   ├── serviceaccount.yaml
+    │   ├── service.yaml
+    │   └── tests
+    │       └── test-connection.yaml
+    └── values.yaml
+
+4 directories, 10 files
+
+1. Root Directory (my-first-chart/)
+This is the Helm Chart directory containing all the necessary files for deploying the application . 
+
+2. Chart.yaml (Chart Metadata)
+This files contains metadata about the Helm chart, like name, description, version, and dependencies.
+eg. 
+	apiVersion: v2
+	name: my-first-chart
+	description: A Helm chart for deploying a web application 
+	version: 1.0.0
+	appVersion: 1.0.0
+
+📌Use Case : Defines the chart details and ensures version control. 
+
+3. values.yaml  (Configuration file)
+This file contains customizable values like replicas, image versions, ports, and environment variables. 
+eg. 
+	replicaCount: 2
+	image: 
+		repository: nginx
+		tag: latest
+	service:
+		type: ClusterIP
+		port: 80
+
+📌 Use Case: Allow users to override default configuration during deployment. 
+
+4. templates/ (Kubernetes Manifest Templates)
+This folder contains templated k8s  manifests that define how resources (Deployments Services, etc) are created. 
+
+a) deployment.yaml (Deploying the Application)
+Defines the Deployment resource.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+     matchLabels:
+        app: my-app
+  template:
+     metadata:
+	labels:
+	app: my-app
+     spec:
+	containers:
+	  - name: my-app
+	    image: "{{ .Values.image.repsitory }}:{{ .Values.image.tag }}"
+
+📌 Use Case: Deploys the app with the image and replicas count from values.yaml 
+
+b) _helpers.tpl (Reusable Template Helpers)
+Defines reusable template functions, like common labels.
+📌 Use Case: Helps in writing cleaner, reusable templates.
+
+c) hpa.yaml (Horizontal Pod Autoscaler)
+Defines the HPA resource to scale pods automatically based on CPU/memory usage.
+
+📌 Use Case: Ensures the app scales dynamically.
+
+d) ingress.yaml (Ingress Configuration)
+Defines the Ingress resource for exposing the application externally.
+
+📌 Use Case: Allows external traffic to reach the application via a domain name.
+
+e) service.yaml (Service Definition)
+Defines a Service to expose the application.
+
+📌 Use Case: Provides stable networking for the app inside Kubernetes.
+
+f) serviceaccount.yaml (Service Account)
+Defines a ServiceAccount if the app needs specific Kubernetes permissions.
+
+📌 Use Case: Assigns permissions to workloads running in the cluster.
+
+g) NOTES.txt (Post-Install Instructions)
+Contains instructions displayed after helm install.
+
+📌 Use Case: Helps users understand what to do after installation.
+
+h) tests/test-connection.yaml (Test Connection)
+A test manifest for verifying that the deployment works correctly.
+
+📌 Use Case: Ensures the application is accessible after deployment.
+
+5. charts/ (Subcharts)
+This directory holds dependent charts (if any).
+
+📌 Use Case: Helps bundle dependencies like databases (e.g., PostgreSQL) alongside the main chart.
+
+
+Create release
+helm install  <release> <chart>
+helm install project-test  my-first-chart
+helm install - the command to deploy a Helm chart.
+< release> - the name you want to give to this deployment (release name)
+<chart> - the name of the helm chart you want to install 
+To check release 
+helm list
+
+Let's create your template
+Firstly remove all file from the my-first-chart/templates/
+rm -rf templates/
+
+vim deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  labels:
+    project: test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      project: test
+  template:
+    metadata:
+      labels:
+        project: test
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+
+vim service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service
+spec:
+  selector:
+    project: test
+  ports:
+   - protocol: TCP
+     port: 80
+     targetPort: 9376
+
+helm install test-project my-first-chart
+Check 
+kubectl get deployment,rs,pod
+kubectl get svc
+
+my-first/chart/values.yaml
+deployment:
+  name: test-project
+  image: nginx:1.14.2
+  replica: 3
+
+service:
+  name: test-project
+
+Second project my-first-chart/values.yaml
+deployment:
+  name: helm-project-03
+  image: nginx:1.14.2
+  replica: 5
+
+service:
+  name: helm-project-03 
+
+helm install helm-project-03  my-first-chart
+# Check all existing helm release 
+helm list 
+helm list -A
+
+To uninstall release
+helm uninstall <releae-name>
+
+To upgrade  or make any changes in the template files
+vim deployment
+replicas: 3  to replicas: 6
+
+helm upgrade test-project my-first-chart
+kubectl get deployments.apps,replicasets.apps,pod
+
+helm list # to check release
+
+
+Summary:
+To create chart
+helm create <char-name> 
+To create release
+helm install <release-name> <chart-name>
+to check release
+helm list
+to upgrade release
+helm upgrade <release-name> <char-name>
+to check release history
+helm history <release-name>
+To uninstall release
+helm uninstall <release-name> <chart-name>
+
+######################################
+Helm upgrade and version v1 to v2 using --set attribute
+
+Create chart
+helm create mychart
+Create release
+helm install release-01 mychart
+Check release
+helm list --output=yaml
+helm list
+
+Check the pod image
+ kubectl describe pod release-01-mychart-67bb57897f-drrxj | grep -i "image:"
+    Image:          nginx:1.16.0
+
+Upgrade the image using --set attribute
+helm upgrade release-01 mychart --set "image.tag=1.20.0"
+helm list 
+helm history release-01
+
+Verify the pod image.
+kubectl describe  pod release-01-mychart-88bbc5fcb-stkrz | grep -i "image:"
+    Image:          nginx:1.20.0
+
+Upgrade version using chart.
+to get artifact  
+https://artifacthub.io/
+
+to add repositories
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+to check repo
+helm repo list
+
+to search chart inside repo
+helm search repo
+
+to see all versions of the chart repo
+helm search repo <repo-name> --versions
+
+to create release:latest of the repo chart 
+helm install <release-name> bitnami/nginx
+
+to create release:16.0.3 particular version of the repo chart 
+helm install <release-name> bitnami/nginx --version "16.0.3"
+
+to pull particular version repository
+helm pull oci://registry-1.docker.io/bitnamicharts/nginx --version "19.0.3"
+
+ls
+tar -xzvf nginx-19.0.3.tgz
+
+ls
+helm install paticular-version nginx..
+
+to check status of release
+helm status newone
+
+to check status of release detailed. 
+helm status newone --show-resources
+
+search repo with name
+helm search repo bitnami/nignx
+
+serach repo with name versions
+helm search repo bitnami/nginx --versions
+
+upgrade chart vesion
+helm upgrade newone bitnami/nginx --version "13.2.1"
+
+check status or release
+helm status newone
+helm status newone | grep -i "chart version:"
+
+
+helm list
+helm history newone
+
+to rollback previous version chart
+helm rollback newone 
+
+To rollback particular version chart with revision no.
+helm rollback newone 1
+
+
+#########################################
+lec 7 uninstall release using --keep-history attribute
+
+Check repo 
+helm repo list
+
+Create new release 
+helm install newone bitnami/nginx --version "12.0.1"
+
+list release
+helm list
+
+Check status of release resources
+helm status newone --show-resources
+
+Upgrade the release
+helm upgrade newone bitnami/nginx --version "15.0.1"
+helm upgrade newone bitnami/nginx --version "16.0.1"
+
+list in yaml fmt
+helm list --output=yaml 
+
+Check history of release 
+helm history newone 
+
+uninstall with --keep-history attribute to save the history for future 
+helm uninstall newone --keep-history 
+check in installed list 
+helm list 
+check in uninstalled list
+helm list --uninstalled
+
+Let's check by creating new release
+helm install newtwo bitnami/nginx
+
+to rollback from uninstalled list & and it also show in installed list
+helm rollback newone 3
+
+###############################################
+lect 8 Helm install using --generate-name flat attribute 
+
+Add repo
+helm repo add bitnami https://charts.bitnami.com/bitnami
+Check repo 
+helm repo list
+Check versions 
+helm search repo bitnami --versions
+
+Create release with --generate-name  attribute
+helm install bitnami/nginx --generate-name
+
+Check release name
+helm list
+
+To generate unique name for release
+helm install bitnami/nginx --generate-name --name-template "devapp-{{randAlpha 7 | lower }}"
+
+helm list
+helm
+
+Check resources status
+helm status devapp-devapp-zwnthwa --show-resources
+
+
