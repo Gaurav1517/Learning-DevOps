@@ -1,0 +1,1558 @@
+############## Ansible ###################
+
+Ansible network configure in ansible-controller & workers 
+
+# All machine should ping each other either in same network or another . 
+
+#check ip of the system both machine
+hostname -i 
+ifconfig
+ifconfig ens160
+
+# # local dns-entry in /etc/hosts file in both machine
+cat <<EOF>> /etc/hosts
+
+192.168.157.150 ansible-controller
+192.168.157.149 ansible-worker01
+EOF
+
+# set hostname of system
+controller:
+hostnamectl set-hostname ansible-controller
+worker01:
+hostnamectl set-hostname ansible-worker01
+
+# refresh terminal in both machine
+bash
+
+# ping with ip & hostname in both machine
+ ping -c 4 192.168.157.150 && \
+ ping -c 4 ansible-controller
+ ping -c 4 192.168.157.149 && \
+ ping -c 4 ansible-worker01
+
+
+#To check the status of various network interfaces on system on ansible controller.
+nmcli show connection 
+# Create new connection for ansible-controller
+nmcli connection add \
+ con-name ansible-controller \
+ ifname ens160 \
+ type ethernet \
+ autoconnect yes
+# connection up 
+nmcli connection up ansible-controller
+# verify network interface
+nmcli show connection 
+# delete older connection ((optional))
+nmcli delete connection <older-connection>
+
+#To check the status of various network interfaces on system on ansible worker01.
+nmcli show connection 
+# Create new connection for ansible-worker01
+nmcli connection add \
+ con-name ansible-worker01 \
+ ifname ens160 \
+ type ethernet \
+ autoconnect yes
+# connection up 
+nmcli connection up ansible-worker01
+# verify network interface
+nmcli show connection 
+# delete older connection ((optional))
+nmcli delete connection <older-connection>
+
+# Create connection with ssh . 
+
+Ansible is agent-less because ssh is already installed in OS. 
+# Check openssh package available on ansible-controller & and all worker nodes
+yum list installed openssh
+rpm -qa | grep openssh-server
+
+# Install Ansible
+REF: https://docs.ansible.com/ansible/2.9/installation_guide/intro_installation.html
+
+### Step 1: Install EPEL repository
+yum install epel-release -y
+### Step 2: Install Python 3.9 and pip
+dnf install python39 python39-pip -y
+### Step 3: Install Ansible using Python 3.9's pip
+python3.9 -m pip install ansible
+### Step 4: Verify Ansible Installation
+ansible --version
+ansible [core 2.15.13]
+  config file = None
+  configured module search path = ['/root/.ansible/plugins/modules', '/usr/share/ansible/plugins/modules']
+  ansible python module location = /usr/local/lib/python3.9/site-packages/ansible
+  ansible collection location = /root/.ansible/collections:/usr/share/ansible/collections
+  executable location = /usr/local/bin/ansible
+  python version = 3.9.6 (default, Aug 25 2021, 16:22:38) [GCC 8.5.0 20210514 (Red Hat 8.5.0-3)] (/usr/bin/python3.9)
+  jinja version = 3.1.6
+  libyaml = True
+
+
+Firstly we need to create configuration file of ansible .
+
+# crate directory 
+mkdir -p /etc/ansible/
+
+cat <<EOF > /etc/ansible/ansible.cfg
+[defaults]
+inventory = /etc/ansible/hosts
+remote_user = root  # Replace with your actual SSH username
+host_key_checking = False  # Optional, disable SSH key checking
+EOF
+
+Create ansible inventory /etc/ansible/hosts file
+cat <<EOF > /etc/ansible/hosts
+# This is the default ansible 'hosts' file.
+#
+# It should live in /etc/ansible/hosts
+#
+#   - Comments begin with the '#' character
+#   - Blank lines are ignored
+#   - Groups of hosts are delimited by [header] elements
+#   - You can enter hostnames or ip addresses
+#   - A hostname/ip can be a member of multiple groups
+
+# Ex 1: Ungrouped hosts, specify before any group headers:
+
+[web]
+192.168.157.149
+[dev]
+192.168.157.145
+
+[dns]
+centos-worker-1
+centos-worker-2
+
+[common:children]
+web
+dns
+
+## green.example.com
+## blue.example.com
+## 192.168.100.1
+## 192.168.100.10
+
+# Ex 2: A collection of hosts belonging to the 'webservers' group:
+
+## [webservers]
+## alpha.example.org
+## beta.example.org
+## 192.168.1.100
+## 192.168.1.110
+
+# If you have multiple hosts following a pattern, you can specify
+# them like this:
+
+## www[001:006].example.com
+
+# You can also use ranges for multiple hosts:
+
+## db-[99:101]-node.example.com
+
+# Ex 3: A collection of database servers in the 'dbservers' group:
+
+## [dbservers]
+##
+## db01.intranet.mydomain.net
+## db02.intranet.mydomain.net
+## 10.25.1.56
+## 10.25.1.57
+
+
+# Ex4: Multiple hosts arranged into groups such as 'Debian' and 'openSUSE':
+
+## [Debian]
+## alpha.example.org
+## beta.example.org
+
+## [openSUSE]
+## green.example.com
+## blue.example.com
+
+EOF
+
+
+Check entry in inventory file /etc/ansible/hosts
+ansible <ip-address-worker01> --list-hosts
+eg. ansible 192.168.157.149 --list-hosts
+
+# to check all worker machine 
+ansible all --list-hosts
+# check with hosts name
+ansible <hostsname> --list-hosts
+eg. ansible ansible-worker01 --list-hosts
+# check entry with group
+ansible <group-name> --list-hosts
+ansible <group-name1> <group-name2> --list-hosts
+eg. ansible web-server --list-hosts
+# group inside group  entry in ansible inventory /etc/ansible/hosts
+[parent-group-name:children] # children is key word.
+group01-name
+group02-name
+# 
+ansible <group01>:<group02> --list-hosts
+
+
+[common:children]
+web-server
+dns-server
+
+ansible common --list-hosts
+
+
+Create custom inventory file 
+touch  /ansible/my-inventory 
+[webserver]
+192.168.157.149
+
+[dnsserver]
+192.168.157.150
+
+ansible all --list-hosts -i /root/ansible/my-inventory
+If we don't want to use default inventory path we need to change in /etc/ansible/ansible.cfg file 
+
+vim /etc/ansible/ansible.cfg
+inventory = /etc/ansible/hosts 
+inventory = /root/ansible/my-inventory 
+
+ansible all --lists-hosts
+ansible dnsserver --list-hosts
+ansible webserver --list-hosts
+
+
+Ansible lab setup for normal user .
+
+Create two user
+useradd -m -s /bin/bash <username> && echo "<username>:<password>" | sudo chpasswd
+useradd -m -s /bin/bash harry && echo "harry:password" | sudo chapsswd 
+useradd -m -s /bin/bash sysops && echo "sysops:password" | sudo chapsswd
+
+Only root user has permission to write in this file
+ls -l /etc/ansible/hosts
+-rw-r--r--. 1 root root 1285 Mar 22 04:32 /etc/ansible/hosts
+
+So each user will create their own inventory file 
+cat <<EOF | tee /home/sysops/sysops-inv
+[sysops-server]
+192.168.157.149
+192.168.157.133
+EOF
+cat <<EOF | tee /home/harry/harry-inv
+[harryserver]
+192.168.157.150
+192.168.157.136
+EOF
+
+ansible all --list-hosts -i sysops-inv
+ansible all --list-hosts -i harry-inv
+
+To overcome from the -i option 
+we copy /etc/ansible/ansible.cfg file every user.
+cp /etc/ansible/ansible.cfg /home/sysops/ansible/
+cp /etc/ansible/ansible.cfg /home/harry/ansible/
+
+Set environment variable for configuration file .cfg
+ export ANSIBLE_CONFIG=/home/sysops/ansible/ansible.cfg
+ export ANSIBLE_CONFIG=/home/harry/ansible/ansible.cfg
+
+cat <<EOF >>  ~/.bashrc
+
+# Exporting ansible .cfg file for sysops user
+export ANSIBLE_CONFIG=/home/sysops/ansible/ansible.cfg
+EOF
+
+cat <<EOF >> ~/.bashrc
+
+# Exporting ansible .cfg file for harry user
+export ANSIBLE_CONFIG=/home/harry/ansible/ansible.cfg
+EOF
+
+# To apply the changes in both users, run:
+source ~/.bashrc
+
+Now all user can change the their inventory path 
+vim /home/sysops/ansible/ansible.cfg
+inventory = /home/sysops/ansible/sysops-inv
+
+vim /home/harry/ansible/ansible.cfg
+inventory = /home/harry/ansible/harry-inv
+
+Check by 
+ansible --version
+ansible sysops-server --list-hosts
+ansible harry-server --list-hosts
+ansible all --list-hosts
+
+
+
+HOW TO USE ANSIBLE COMMAND 
+
+Note: 
+	if you are running any command in with root user or any normal user , so on worker  nodes  that user should be exists.
+	Now on /etc/ansible/ansible.cfg file  this should be uncomment 
+host_key_checking = False  # Optional, disable SSH key checking
+
+
+syntax: 
+ansible <group-name/ip-address> -m command -a ""
+	group-name/ip-address = worker nodes ip or group-name
+	-m = module command-name
+	-a  = arguments in quotes
+	
+Now if run this command  again get some error ..
+ansible web -m command -a "uptime"
+192.168.157.149 | UNREACHABLE! => {
+    "changed": false,
+    "msg": "Failed to connect to the host via ssh: Warning: Permanently added '192.168.157.149' (ECDSA) to the list of known hosts.\r\nroot  # Replace with your actual SSH username@192.168.157.149: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).",
+    "unreachable": true
+}
+
+We need to configure some sshpass
+wget https://sourceforge.net/projects/sshpass/files/sshpass/1.05/sshpass-1.05.tar.gz
+tar -xvzf sshpass-1.05.tar.gz
+sudo yum groupinstall "Development Tools" 
+cd sshpass-1.05/
+ ./configure
+ make
+ sudo make install
+ sshpass -V
+
+But we need to specify -k  for prompt password and -u for user.
+ansible web -m command -a "uptime" -k -u root
+SSH password:
+192.168.157.149 | CHANGED | rc=0 >>
+ 19:55:59 up 58 min,  2 users,  load average: 0.04, 0.10, 0.09
+
+Raw module 
+ used to run multiple command in one go. 
+ansible web -m raw -a "ls;date;uptime" -k -u root
+SSH password:
+192.168.157.149 | CHANGED | rc=0 >>
+anaconda-ks.cfg                     Music            sshpass-1.05 sshpass-1.05.tar.gz
+Desktop                             Pictures         Templates
+Documents                           Public           Videos	Downloads                           
+Sat Mar 22 20:01:13 PDT 2025
+ 20:01:13 up  1:03,  2 users,  load average: 0.12, 0.08, 0.09
+Shared connection to 192.168.157.149 closed.
+
+
+To overcome from the password prompt -k  
+we use ssh private key 
+in ansible-master node create ssh key 
+ssh-keygen
+ls -l .ssh/
+
+ssh-copy-id root@192.168.157.149
+password:
+Verify on ansible-worker-node01
+ls -l ~/.ssh/
+total 8
+-rw-------. 1 root root 572 Mar 22 20:04 authorized_keys
+
+to overcome form the defined user -u 
+set the ansible_user in your inventory file (e.g., /etc/ansible/hosts or a custom inventory file).
+[web]
+192.168.157.149 ansible_user=root
+
+You can also set the default user globally in the ansible.cfg file, which is typically located in /etc/ansible/ansible.cfg or in your home directory (~/.ansible.cfg):
+
+[defaults]
+remote_user = root
+
+Even though you've set remote_user = root in the Ansible configuration, SSH on the remote host must allow root login. On the remote machine (192.168.157.149), check the following:
+
+    Open the SSH configuration file /etc/ssh/sshd_config:
+
+sudo vim /etc/ssh/sshd_config
+
+Ensure the following line is present and not commented out:
+
+PermitRootLogin yes
+
+If it is set to no or commented out, it would prevent SSH access as root.
+
+Restart the SSH service after making any changes:
+
+    sudo systemctl restart sshd
+
+2. Check the SSH Public Key Authentication
+
+Even though you've copied the SSH public key (/root/.ssh/id_rsa.pub) to the remote server using ssh-copy-id, there may still be issues with how the keys are being used. Let’s verify a few things:
+
+    Permissions on the .ssh directory and authorized_keys file on the target machine (192.168.157.149):
+
+sudo chmod 700 /root/.ssh
+sudo chmod 600 /root/.ssh/authorized_keys
+
+Test the SSH connection manually to confirm that the key is being used correctly. Try to SSH as root into the target machine:
+
+ssh root@192.168.157.149
+
+# verify
+ ansible web -m command -a "ls -la"
+ansible web -m raw -a "ls -l;date;uptime"
+
+####################################################
+To  check all modules
+ansible-doc -l 
+
+Adhoc Command
+
+Copy module
+# To get help of copy module.
+ansible-doc copy
+
+# Copy /etc/passwd file to /tmp dir
+ansible web -m copy -a 'src=/etc/passwd dest=/tmp'
+# Check that /etc/passwd file is copied  in /tmp directory 
+ansible web -m command -a 'ls -l /tmp/passwd'
+
+# Task to create two user "aws" & "azure" on ansible-worker-nodes, copy /etc/group file with owner=aws group=azure mode='0777' in /tmp directory .
+useradd -m -s /bin/bash aws && echo "aws:aws" | sudo chpasswd 
+useradd -m -s /bin/bash azure && echo "azure:azure" | sudo chpasswd
+# Verify user 
+id aws
+id azure
+ansible web -m copy -a "src=/etc/group dest=/tmp owner=aws group=azure mode='0777'"
+# Verify 
+ansible web -m command -a "ls -l /tmp"
+
+
+# if we copy same file but append some text "Copy a new "/etc/group" file into place, backing
+up the original if it differs from the copied version.
+Adding user Linux to make some changes in /etc/group file 
+useradd -m -s /bin/bash linux && echo "linux:password" | sudo chpasswd
+
+ansible web -m copy -a "src=/etc/group dest=/tmp owner=aws group=azure mode='0777' backup=yes"
+
+ansible web -m command -a "ls -lh /tmp/group"
+
+# copy from target machine to target machine. 
+ansible web -m copy -a "src=/var/log/dnf.log remote_src=yes dest=/tmp owner=aws group=azure mode=0770"
+#Verify
+ansible web -m command -a "ls -lh /tmp/dnf.log"
+
+################################################
+Ansible Fetch module
+
+It is used for fetching files from remote machines and storing them in a file tree, organized by hostname. Files that already exist at 'dest' will be overwritten if they are different than the 'src'. This module is also supported for windows targets. 
+
+# to check doc of fetch module
+ansible-doc fetch 
+ansible web -m fetch -a "src=/var/log/dnf.log dest=/logs"
+# Verify
+tree /logs/
+/logs/
+└── 192.168.157.149
+    └── var
+        └── log
+            └── dnf.log
+
+3 directories, 1 file
+
+
+################################################
+
+Ansible File Module
+
+To check file module doc
+ansible-doc file
+
+Create directory in /tmp dir using file module
+ansible web -m file -a "/tmp/file-module-dir state=directory"
+ansible web -m command -a "ls -lh /tmp"
+
+Create file in /tmp file using file module
+ansible web -m file -a "/tmp/file-module-file state=touch owner=aws group=azure mode=0770"
+ansible web -m command -a "ls -lh /tmp"
+
+To delete dir with file module
+ansible web -m file -a "path=/tmp/file-module-dir state=absent"
+ansible web -m command -a "ls -lh /tmp"
+
+Create a soft link of the file /tmp/test-dir/test-file  to /tmp/symbolic-link-file
+ansible web -m file -a "src=/tmp/test-dir/test-file dest=/tmp/symbolic-link-file state=link"
+ansible web -m command -a "ls -lh /tmp"
+
+Create a hard link of the file /tmp/test-dir/test-file  to /tmp/symbolic-hard-link-file
+ansible web -m file -a "src=/tmp/test-dir/test-file dest=/tmp/symbolic-hard-link-file state=hard"
+ansible web -m command -a "ls -lh /tmp"
+
+
+#######################################
+
+Shell module
+The `shell' module takes the command name followed by a list of space-delimited arguments . Either a free form command  or 	`cmd' parameter is required .
+It is almost exactly like the ansible comamnd module but runs the command throught a shell /bin/sh or the remote node. 
+
+To read doc for shell module
+ansible-doc shell
+
+To do this example create script test-script.sh
+#!/bin/bash
+echo  "***** Test script to create dir && files *****"
+mkdir /tmp/test-dir
+cd /tmp/test-dir
+touch abc
+cp -rvf /etc/* /tmp/test-dir
+echo "******Script run successfully!!******"
+
+Assign executeable persmission 
+chomod +x test-script.sh
+
+copy to ansible-worker nodes
+ ansible web -m copy -a "src=/root/ansible/script/test-script.sh dest=/tmp mode=0755"
+
+Verify
+ansible web -m command -a "ls -lh /tmp"
+
+Run script 
+ansible web -m shell -a 'sh /tmp/test-script.sh'
+
+Verify
+ansible web -m command -a "ls -lh /tmp/test-dir/"
+
+#############################################
+Ansible Package Module
+This modules manages package on a target without specifying a package manager module  like yum, apt, ... . It is convenient to use in an package manger. package call behind the module of the package manager used by the operation system discovered by the module ansible.builtin.setup . If setup was not yet run, package will run it. This module acts as a proxy to the underlying package manger module. while all arguments  will be passed to the underling module, not all modules support the small arguments.
+
+
+To read doc for package module
+ansible-doc package
+
+
+Install httpd package on ansible worker nodes
+ansible web -m package -a 'name=httpd' state=present'
+Verify
+ansible web -m raw -a "rpm -qa | grep httpd"
+
+To remove package 
+ansible web -m package -a name=httpd state=absent"
+
+NOte: this key word can be used to install or remove the packages :
+		absent, present, installed , removed , latest
+
+use attributes for package module
+The required package manger module to use yum, apt, and so no . The default auto will use existing facts or try to autodetect it. 
+You should only use this field if the automatic selection is not working  for some reason. 
+default: auto
+
+ansible web -m package -a "name=samba* state=latest use=yum"
+
+###############################################
+
+Ansible yum module
+there are 2 module yum and yum_repository
+
+Check with ansible doc command 
+ansible-doc -l | grep yum
+
+yum_repository
+Add or remove yum repository is RPM-based Linux distributions. IF you wish to update an repository definition use [community.general.ini_file] instead.
+
+Check doc for  ansible yum_repository
+ansible-doc yum_repository
+
+Configure yum_repository
+ansible web -m yum_repository -a "name=yum-server description='this is my first yum server' file=my_yum_server baseurl=https://download.fedoraproject.org/pub/epel/$releasever/$basearch/ gpgcheck=no enabled=yes"
+
+Verify
+ansible web -m command -a "yum repolist"
+ansible web -m raw -a  "ls -lh /etc/yum.repos.d/ | grep my_yum_server"
+ansible web -m  command -a " cat /etc/yum.repos.d/my_yum_server.repo"
+[yum-server]
+baseurl = https://download.fedoraproject.org./pub/epel///
+enabled = 1
+gpgcheck = 0
+name = this is my first yum sever
+
+To remove specific repo yum_repository
+ansible web -m yum_repository -a "name=yum-server state=absent file=my_yum_server"
+ansible web -m command -a "ls -lh /etc/yum.repos.d/"
+
+
+###########################################
+yum module
+
+To check doc
+ansible-doc yum
+
+To install package
+ansible web -m yum -a "name=httpd state=latest"
+ansible web -m raw -a "rpm -qa | grep httpd"
+
+To remove package
+ansible web -m yum -a "name=httpd state=absent"
+ansible web -m raw -a "rpm -qa | grep httpd"
+
+To install package from particular repository
+Check the available  repo
+ansible web -m raw -a "yum repolist"
+ansible web -m yum -a "name=httpd state=present enablerepo=baseos"
+ansible web -m raw -a "rpm -qa | grep httpd"
+
+To update all package in the system
+ansible web  -m yum -a "name='*' state=latest"
+
+Upgrade all packages, excluding kernel & foo related packages
+
+#############################################################
+service module
+Controls services on remote hosts. Supported init systems include BSD init, OpenRC, SysV, Solaris SMF, system, upstart,. This module acts as a proxy to the underlying service manger module. While all arguments will be passwd to the underlying module, not all module support the same argument. 
+
+To check doc for service module
+ansible-doc service
+
+For this service firstly we install httpd server then append text inside /var/www/html/index.html file 
+ansible web -m yum -a "name=httpd state=latest"
+
+ansible web -m copy -a "content='this is demo content from httpd server' dest=/var/www/html/index.html"
+
+Check the content of the file /var/www/html/index.html
+ansible web -a command -a "cat /var/www/html/index.html"
+
+Check the status of the service
+ansible web -m systemd -a "name=httpd state=status"
+
+permanently Start httpd.service
+ansible web -m service -a "name=httpd state=started enabled=yes"
+
+ansible web -m command -a "systemctl status httpd"
+
+
+permanently stop htted.service
+ansible web -m service -a "name=httpd state=stopped enabled=no"
+Reload service
+ansible web -m service -a "name=httpd state=reloaded"
+Restart service
+ansible web -m service -a "name=httpd state=restarted"
+
+####################################################
+Ansible User & Group Module 
+
+Group
+Manage presence of groups on a host. For Windows targets, use the [ansible.windows.win_group]  module instead. 
+
+To check doc for group
+ansible-doc group
+
+To create group
+ansible web -m group -a "name=wipro state=present"
+ansible web -m command -a "tail -2 /etc/group"
+
+To delete group
+ansible web -m group -a "name=wipro state=absent"
+ansible web -m command -a "tail -2 /etc/group"
+
+User
+Manage user account and user attributes. For windows targets , use the  [ansible.windows.win_user] module instead. 
+
+To check doc for user
+ansible-doc user
+
+Create user  named johnd and assign uid=1050 group=azure comment= john sysadmin 
+ansible web -m user -a "name=johnd comment='John sysadmin' uid=1050 group=azure"
+Verify
+ansible web -m command -a "id johnd"
+ansible web -m command -a "tail -2 /etc/passwd"
+ansible web -m command -a "getent group 1002"  # it show gid of azure group
+
+Change the existing user shell=/sbin/nologin and add group=aws,azure 
+ansible web -m user -a "name=johnd shell=/sbin/nologin  groups=azure,aws append=yes"
+ansible web -m command -a "id johnd"
+ansible web -m command -a "tail -2 /etc/passwd"
+
+To delete user johnd also home dir
+ansible web -m user -a "name=johnd state=absent remove=yes"
+ansible web -m command -a "id johnd"
+ansible web -m command -a "ls -l /home"
+
+Create ssh key for user
+ansible web -m user -a "name=aws generate_ssh_key=yes ssh_key_bits=2048 ssh_key_file=.ssh/id_rsa"
+
+Verify
+ansible web -m command -a "ls -la /home/aws/.ssh"
+
+####################################################
+
+Ansible lineinfile module
+
+ This module ensures a particular line is in a file, or replace
+        an existing line using a back-referenced regular expression.
+        This is primarily useful when you want to change a single line
+        in a file only. See the [ansible.builtin.replace] module if
+        you want to change multiple, similar lines or check
+        [ansible.builtin.blockinfile] if you want to
+        insert/update/remove a block of lines in a file. For other
+        cases, see the [ansible.builtin.copy] or
+        [ansible.builtin.template] modules.
+
+to check doc of lineinfile
+ansible-doc linefile
+
+to append line in file /etc/sudoers
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops   ALL=(ALL)   ALL'"
+ansible web -m command  -a "tail -2 /etc/sudoers"
+
+To delete any text 
+ansible web -m lineinfile -a "path =/etc/sudoers line='sysops   ALL=(ALL)   ALL'  state=absent"
+ansible web -m command  -a "tail -2 /etc/sudoers"
+
+
+Insert beginning of the file (BOF)
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops   ALL=(ALL)   ALL' insertafter=BOF"
+ansible web -m command  -a "head -2 /etc/sudoers"
+
+Delete line BOF 
+ ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)  ALL' insertafter=BOF state=absent"
+ansible web -m command  -a "head -2 /etc/sudoers"
+
+Insert EOF (End Of File)
+ ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)  ALL' insertafter=EOF "
+ansible web -m command  -a "tail -2 /etc/sudoers"
+
+Delete line EOF 
+ ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)  ALL' insertafter=EOF state=absent"
+ansible web -m command  -a "tail -2 /etc/sudoers"
+
+Insert after specific line 
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)   ALL' insertafter='^root'"
+ansible web -m command -a "grep -A 2 'root' /etc/sudoers"
+
+Delete specific line
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)   ALL' insertafter='^root' state=absent"
+ansible web -m command -a "grep -A 2 'root' /etc/sudoers"
+
+Insert before specific line
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)   ALL' insertbefore='^root'"
+ansible web -m command -a "grep -A 2 'root' /etc/sudoers"
+
+Delete specific line
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)   ALL' insertbefore='^root' state=absent"
+ansible web -m command -a "grep -A 2 'root' /etc/sudoers"
+
+To replace particular expression with line
+ansible web -m lineinfile -a "path=/etc/sudoers  line='syosps  ALL=(ALL)   ALL'  regexp='temp-user' "
+ansible web -m command -a "grep 'sysops' /etc/sudoers"
+
+to delete specific line
+ansible web -m lineinfile -a "path=/etc/sudoers line='sysops  ALL=(ALL)   ALL'  state=absent"
+
+to delete with regexp
+ansible web -m lineinfile -a "path=/etc/sudoers regexp='^temp-user' state=absent "
+
+TASK:
+To disable selinux 
+ansible web -m lineinfile -a "path=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled'"
+
+
+##########################################################
+
+Ansible Playbook
+
+Ad-hoc method
+file method (playbook)
+
+It support 2 lang. 
+yaml/yml
+json
+
+3 ways to write playbook
+1. Single line format
+2. Multi line format
+3. Dictionary format (easy)
+
+Dictionary format
+vim dictonary-fmt.yaml
+- hosts: web                   #(group-name) target machine
+  tasks:                          # task
+    - copy:                       # module
+         src: /etc/passwd    # attributes
+         dest: /tmp/
+         owner: aws
+         group: azure
+         mode: 0770
+
+ansible-playbook dictonary-fmt.yaml
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+create multiple task
+vim dictonary-fmt.yaml
+- hosts: web               # (group-name) target machine
+  tasks:                   # task
+  # copying file with change onwer group & file permission
+    - copy:                # module
+        src: /etc/passwd   # attributes
+        dest: /tmp/
+        owner: aws
+        group: azure
+        mode: 0770
+
+   # Creating directory
+    - file:
+        path: /tmp/ansible
+        state: directory
+
+  # Create file
+    - file:
+        path: /tmp/ansible/test.txt
+        state: touch
+
+ansible-playbook dictonary-fmt.yaml
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+TASK for Dictionary format
+Install httpd package configure content inside and start & enable service 
+
+vim dict-task-1.yaml
+- hosts: web
+  tasks:
+    # Install httpd package
+    - yum:
+        name: httpd
+        state: latest
+
+    # appending content
+    - copy:
+        content: 'Configure the HTTPD server using the Ansible playbook dict-fmt.'
+        dest: /var/www/html/index.html
+
+    # service start & enable
+    - service:
+        name: httpd
+        state: started
+        enabled: yes
+
+ansible-playbook dict-task-1.yaml
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [yum] *****************************************************************************
+changed: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [service] *************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+curl http://192.168.157.149:80
+Configure the HTTPD server using the Ansible playbook dict-fmt.
+
+
+#########################################################
+
+Singleline format
+vim singleline-fmt.yaml
+- hosts: web
+  tasks:
+    - copy: src=/etc/group dest=/tmp owner=aws group=azure mode=0770
+    - file: path=/tmp/aws state=directory
+    - yum: name=tree state=latest
+    - service: name=httpd state=restarted
+
+ansible-playbook singleline-fmt.yaml
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [yum] *****************************************************************************
+changed: [192.168.157.149]
+
+TASK [service] *************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=5    changed=4    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+########################################################
+Multiline format
+
+ multiline-fmt.yaml
+- hosts: web
+  tasks:
+    - copy: src=/etc/shadow
+            dest=/tmp
+            owner=aws
+            group=azure
+            mode=0770
+
+    - file: path=/tmp/azure
+            state=directory
+
+    - yum:  name=nfs-utils
+            state=latest
+
+    - service: name=nfs-server
+               state=started
+               enabled=yes
+
+ansible-playbook multiline-fmt.yaml
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [yum] *****************************************************************************
+ok: [192.168.157.149]
+
+TASK [service] *************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=5    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+ ansible web -m command -a "service nfs-server status"
+ ansible web -m command -a "ls -l /tmp"
+
+###########################################################
+Json format
+
+User online converter yaml to json
+https://onlineyamltools.com/convert-yaml-to-json
+
+
+vim json-dict-fmt.json
+[
+  {
+    "hosts": "web",
+    "tasks": [
+      {
+        "copy": {
+          "src": "/etc/hosts",
+          "dest": "/tmp/",
+          "owner": "aws",
+          "group": "azure",
+          "mode": 0770
+        }
+      },
+      {
+        "file": {
+          "path": "/tmp/json-dict-fmt",
+          "state": "directory"
+        }
+      },
+      {
+        "file": {
+          "path": "/tmp/json-dict-fmt/json-dict.txt",
+          "state": "touch"
+        }
+      }
+    ]
+  }
+]
+
+ ansible-playbook json-dict-fmt.json
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+vim  json-single-fmt.json
+[
+  {
+    "hosts": "web",
+    "tasks": [
+      {
+        "copy": "src=/etc/group dest=/tmp owner=aws group=azure mode=0770"
+      },
+      {
+        "file": "path=/tmp/single-json-fmt state=directory"
+      },
+      {
+        "yum": "name=tree state=latest"
+      },
+      {
+        "service": "name=httpd state=restarted"
+      }
+    ]
+  }
+]
+
+ ansible-playbook json-single-fmt.json
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [yum] *****************************************************************************
+ok: [192.168.157.149]
+
+TASK [service] *************************************************************************
+changed: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=5    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+vim multi-json-fmt.json
+[
+  {
+    "hosts": "web",
+    "tasks": [
+      {
+        "copy": "src=/etc/shadow dest=/tmp owner=aws group=azure mode=0770"
+      },
+      {
+        "file": "path=/tmp/azure state=directory"
+      },
+      {
+        "yum": "name=nfs-utils state=latest"
+      },
+      {
+        "service": "name=nfs-server state=started enabled=yes"
+      }
+    ]
+  }
+]
+
+ ansible-playbook multi-json-fmt.json
+
+PLAY [web] *****************************************************************************
+
+TASK [Gathering Facts] *****************************************************************
+ok: [192.168.157.149]
+
+TASK [copy] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [file] ****************************************************************************
+changed: [192.168.157.149]
+
+TASK [yum] *****************************************************************************
+ok: [192.168.157.149]
+
+TASK [service] *************************************************************************
+ok: [192.168.157.149]
+
+PLAY RECAP *****************************************************************************
+192.168.157.149            : ok=5    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+#######################################################
+lec-20
+Define multi-host/target node in single ansible-playbook
+
+ vim multi-host.yaml
+- name: Create file on Web and copy it to Dev
+  hosts: web
+  tasks:
+    - name: Create file on 192.168.157.149 (Web)
+      file:
+        path: /tmp/host-01.txt
+        state: touch
+
+- name: dev hosts
+  hosts: dev
+  tasks:
+   - user:
+      name: katherine
+      comment: "actress group"
+      shell: /bin/bash
+ ansible-playbook multi-host.yaml
+
+PLAY [Create file on Web and copy it to Dev] ********************************************************
+
+TASK [Gathering Facts] ******************************************************************************
+ok: [192.168.157.149]
+
+TASK [Create file on 192.168.157.149 (Web)] *********************************************************
+changed: [192.168.157.149]
+
+PLAY [dev hosts] ************************************************************************************
+
+TASK [Gathering Facts] ******************************************************************************
+ok: [192.168.157.148]
+
+TASK [user] *****************************************************************************************
+changed: [192.168.157.148]
+
+PLAY RECAP ******************************************************************************************
+192.168.157.148            : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+192.168.157.149            : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Check 
+ansible dev -m command -a "id katherine"
+192.168.157.148 | CHANGED | rc=0 >>
+uid=1002(katherine) gid=1002(katherine) groups=1002(katherine)
+ansible web -m command -a "ls -l /tmp/host-01.txt"
+192.168.157.149 | CHANGED | rc=0 >>
+-rw-r--r--. 1 root root 0 Apr  1 09:18 /tmp/host-01.txt
+
+
+#########################################################
+lec 21
+
+Reference call from another file using  import_tasks attribute
+
+ vim main.yaml
+- name: this is web server group machine
+  hosts: web
+  tasks:
+    - import_tasks: task1.yaml
+
+- name: the is dev server group machine
+  hosts: dev
+  tasks:
+    - import_tasks: task2.yaml
+
+vim task1.yaml
+- name: copy /etc/passwd to /tmp directory
+  copy:
+    src: /etc/passwd
+    dest: /tmp
+    owner: aws
+    group: azure
+    mode: 0770
+
+- name: create directory /tmp/ansible
+  file:
+    path: /tmp/ansible
+    state: directory
+
+vim task2.yaml
+ - name: installing httpd package
+  yum:
+    name: httpd
+    state: latest
+
+- name: start & enable httpd service
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+
+
+import multiple file in same tasks
+vim main.yaml
+- name: this is web server group machine
+  hosts: web
+  tasks:
+    - import_tasks: task1.yaml
+    - import_tasks: task3.yaml
+
+Task:
+allow port 8082 in firewalld 
+
+vim firewall.yaml
+- name: task run on dev servers
+  hosts: dev
+  tasks:
+    - name: allow port 8082 in firewalld
+      firewalld:
+        port: 8082/tcp
+        zone: public
+        permanent: true
+        state: enabled
+        immediate: true
+
+
+############################################################
+lec 22
+configure apache server 
+
+vim web-server.conf
+- name: Configure web server in web group machine
+  hosts: dev
+  tasks:
+   - name: Installing httpd package
+     yum:
+       name: httpd
+       state: latest
+
+   - name: copy sourcecode to /var/www/html/
+     copy:
+       src: /root/ansible/playbook/apache-sever-conf/sourcecode/
+       dest: /var/www/html/
+
+   - name: chage the port no. 80 to 8080
+     lineinfile:
+       path: /etc/httpd/conf/httpd.conf
+       regexp: '^Listen'
+       insertafter: '^#Listen'
+       line: 'Listen 8080'
+
+   - name: allow port 8080 in firewalld
+     firewalld:
+       port: 8080/tcp
+       zone: public
+       permanent: true
+       state: enabled
+       immediate: true
+
+   - name: start & enable httpd service
+     service:
+       name: httpd
+       state: started
+       enabled: yes
+
+ ansible-playbook web-server.yaml
+
+PLAY [Configure web server in web group machine] **************************************************************************************************************************
+
+TASK [Gathering Facts] ****************************************************************************************************************************************************
+ok: [192.168.157.151]
+
+TASK [Installing httpd package] *******************************************************************************************************************************************
+changed: [192.168.157.151]
+
+TASK [copy sourcecode to /var/www/html/] **********************************************************************************************************************************
+changed: [192.168.157.151]
+
+TASK [chage the port no. 80 to 8080] **************************************************************************************************************************************
+changed: [192.168.157.151]
+
+TASK [allow port 8080 in firewalld] ***************************************************************************************************************************************
+changed: [192.168.157.151]
+
+TASK [start & enable httpd service] ***************************************************************************************************************************************
+changed: [192.168.157.151]
+
+PLAY RECAP ****************************************************************************************************************************************************************
+192.168.157.151            : ok=6    changed=5    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Check :
+systemctl status httpd.service
+firewall-cmd --list-all
+sed -n '/Listen 8080/p' /etc/httpd/conf/httpd.conf
+hostname -i 
+ curl http://192.168.157.151:8080
+Or 
+browse from browser  http://192.168.157.151:8080
+
+###########################################################
+lec 25 Ansible Variable Part-1
+
+
+vim variable.yaml
+- name: Varaible demonstaration
+  hosts: dev
+  vars:
+    mydir: /tmp/var-dir
+    myfile: /etc/passwd
+    mypkg:
+      - httpd
+      - nfs-utils
+      - tree
+
+  tasks:
+    - name: create dirctory "{{ mydir }}"
+      file:
+        path: "{{ mydir }}"
+        state: directory
+
+    - name: copy file "{{ myfile }}" to "{{ mydir }}"
+      copy:
+        src: "{{ myfile }}"
+        dest: "{{ mydir }}"
+        owner: elliot
+        group: harry
+        mode: 0770
+
+    - name: Installing package "{{ mypkg }}"
+      yum:
+        name: "{{ mypkg }}"
+        state: latest
+[root@centos-master variables]# ansible-playbook variable.yaml
+
+PLAY [Varaible demonstaration] **********************************************************************
+
+TASK [Gathering Facts] ******************************************************************************
+ok: [192.168.157.151]
+
+TASK [create dirctory "/tmp/var-dir"] ***************************************************************
+changed: [192.168.157.151]
+
+TASK [copy file "/etc/passwd" to "/tmp/var-dir"] ****************************************************
+changed: [192.168.157.151]
+
+TASK [Installing package "['httpd', 'nfs-utils', 'tree']"] ******************************************
+changed: [192.168.157.151]
+
+PLAY RECAP ******************************************************************************************
+192.168.157.151            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Check 
+rpm -q httpd
+tree /tmp
+ls -l /tmp/var-dir/
+
+##########################################################
+lec 24 
+Ansible Variable part-2 
+
+Variable define in another file .
+myvariable/var.yaml
+mydir: /tmp/var-directory
+myfile: /etc/fstab
+mypkg:
+  - httpd
+  - tree
+
+[root@centos-master variables]# cat main.yaml
+- name: Varaible demonstaration
+  hosts: dev
+  vars_files:
+    - /root/ansible/playbook/variables/myvariable/var.yaml
+
+  tasks:
+    - name: create dirctory "{{ mydir }}"
+      file:
+        path: "{{ mydir }}"
+        state: directory
+
+    - name: copy file "{{ myfile }}" to "{{ mydir }}"
+      copy:
+        src: "{{ myfile }}"
+        dest: "{{ mydir }}"
+        owner: elliot
+        group: harry
+        mode: 0770
+
+    - name: Installing package "{{ mypkg }}"
+      yum:
+        name: "{{ mypkg }}"
+        state: latest
+
+[root@centos-master variables]# ansible-playbook main.yaml
+
+PLAY [Varaible demonstaration] **********************************************************************
+
+TASK [Gathering Facts] ******************************************************************************
+ok: [192.168.157.151]
+
+TASK [create dirctory "/tmp/var-directory"] *********************************************************
+changed: [192.168.157.151]
+
+TASK [copy file "/etc/fstab" to "/tmp/var-directory"] ***********************************************
+changed: [192.168.157.151]
+
+TASK [Installing package "['httpd', 'tree']"] *******************************************************
+changed: [192.168.157.151]
+
+PLAY RECAP ******************************************************************************************
+192.168.157.151            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Check 
+rpm -q httpd
+tree /tmp
+
+#############################################
+
+Lecture 23
+Ansible Variable part-3
+
+
+vars_files:
+    - /root/ansible/playbook/variables/myvariable/var.yaml
+
+
+Define variable in command -line 
+ use option -e variable=value -e variable=value1,value2
+syntax:
+	ansible-playbook playbook-name.yaml -e variable1=value -e varaible2=value1,value2
+
+eg.
+vim  main.yaml
+- name: Varaible demonstaration
+  hosts: dev
+
+  tasks:
+    - name: create dirctory "{{ mydir }}"
+      file:
+        path: "{{ mydir }}"
+        state: directory
+
+    - name: copy file "{{ myfile }}" to "{{ mydir }}"
+      copy:
+        src: "{{ myfile }}"
+        dest: "{{ mydir }}"
+        owner: elliot
+        group: harry
+        mode: 0770
+
+    - name: Installing package "{{ mypkg }}"
+      yum:
+        name: "{{ mypkg }}"
+        state: latest
+[root@centos-master variables]# ansible-playbook main.yaml -e mydir=/tmp/cmd-dir -e myfile=/etc/passwd -e mypkg=httpd,tree
+
+PLAY [Varaible demonstaration] **********************************************************************
+
+TASK [Gathering Facts] ******************************************************************************
+ok: [192.168.157.151]
+
+TASK [create dirctory "/tmp/cmd-dir"] ***************************************************************
+changed: [192.168.157.151]
+
+TASK [copy file "/etc/passwd" to "/tmp/cmd-dir"] ****************************************************
+changed: [192.168.157.151]
+
+TASK [Installing package "httpd,tree"] **************************************************************
+changed: [192.168.157.151]
+
+PLAY RECAP ******************************************************************************************
+192.168.157.151            : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+Ansible Playbook Variables Interview Question:
+
+Preference of Calling Variables
+
+Suppose we have defined variables in a playbook like this:
+
+vars:
+  mydir: /tmp/playbook-var-dir
+  myfile: /etc/groups
+  mypkg:
+    - samba
+    - nfs-utils
+
+Now, the same variables are defined on the command line like this:
+
+ansible-playbook playbook-name.yaml \
+  -e mydir=/tmp/cmd-line-dir \
+  -e myfile=/etc/hosts \
+  -e mypkg=tree,httpd
+
+Additionally, the same variables are defined in another file, as shown below, and included in the playbook using vars_files:
+
+# variables/var.yaml
+mydir: /tmp/another-file-var-dir
+myfile: /etc/shadow
+mypkg:
+  - samba
+  - nfs-utils
+
+And in the playbook:
+
+vars_files:
+  - /variables/var.yaml
+
+Question:
+Which variables will be used? In other words, which variables have the highest priority?
+
+Ans: 
+In Ansible, the variable precedence follows this order (from highest to lowest):
+
+    Command-line variables (-e) — highest priority.
+
+    Variables in vars_files — next priority.
+
+    Variables defined in the playbook (vars) — lowest priority.
+
+So, in this case:
+
+    mydir, myfile, and mypkg from the command line will override the playbook and vars_files values.
+
+    If not set in the command line, the values from vars_files will be used.
+
+    If neither is provided, the playbook variables will be used.
+############################################################
+lec 26
+Ansible Variable
+Define variable inventory file 
+	NOTE: inventory default path /etc/ansible/hosts
+
+vim /etc/ansible/hosts/
+[web]
+192.168.157.149  ansible_user=root  mydir=/tmp/inventory-web-dir myfile=/etc/hosts mypkg=tree,nfs-utils
+[dev]
+192.168.157.151 ansible_user=root mydir=/tmp/inventory-dev-dir myfile=/etc/shadow mypkg=httpd,samba
+
+vim main.yaml
+- name: tasks run in all  group
+  hosts: all
+  tasks: 
+     - name: "create directory name {{ mydir }} "
+       file:
+         path: "{{ mydir }}"
+         state: directory
+    
+     - name: "copy file from {{ myfile }} to {{ mydir }} "
+       copy:
+          src: "{{ myfile }}"
+          dest:  "{{ mydir }}"
+          owner: aws
+          group: azure
+          mode: 0770
+
+     - name: " install some packages {{ mypkg }}"
+       yum: 
+          name: "{{ mypkg }}"
+          state: latest
+
+ansible-playbook main.yaml 
