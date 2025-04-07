@@ -396,4 +396,119 @@ helm
 Check resources status
 helm status devapp-devapp-zwnthwa --show-resources
 
+lec 9 Helm to install using --atomic, --wait --timeout attributes. 
 
+--atomic  if set, the installation process deletes the installation on failure, the --wait flag will be set automatically if --atomic is used. 
+
+
+helm install release-name repository/chart-name
+
+If anything wrong in chart then it will create release but give error to avoid creation if any error in chart we user --atomic 
+Let's make error manually in chart. 
+	vim chart-name/values.yaml
+	service:
+	   type: ClusterIP
+	   port-error: 80
+
+	helm install release-name chart-name --atomic 
+Output: 	
+	Error: INSTALLATION FAILED : release release-name failed , and had been uninstalled  due to atomic being set: 2 error occurred:
+		*  Service "release-name-chart-name" is invalid : spec.port[0] port: Invalid value 0 : must be between 1 and 65535, inclusive
+		*  Deployment.apps "release-name-chart-name: is invalid : spec.template.spec.container[0].ports.containerPort: Required value. 
+
+Fix the error and try to create new release. 
+helm install release-name chart-name
+helm list 
+helm list --output=yaml
+
+increase the replica in 
+	vim chart-name/values.yaml 
+		replicaCount: 3
+
+helm upgrade release-name chart-name
+helm list
+helm history release-name
+helm status release-name --show-resources 
+
+update release 3  to 5  times to understand the --atomic  flag 
+
+Let's do some syntactical error in chart like 
+Let's make error manually in chart. 
+	vim chart-name/values.yaml
+	service:
+	   type: ClusterIP
+	   port-error: 80
+and update the values.yaml 
+	vim chart-name/values.yaml 
+		replicaCount: 10
+
+helm upgrade release-name chart-name 
+it create release but in failed state. 
+helm list
+helm history release-name 
+
+But if we use --atomic flag  it rollback to last revision upgrade. 
+helm upgrade  release-name chart-name --atomic 
+helm list 
+helm history release-name 
+
+When we use --atomic automatically --wait with default 300sec time flag is used. 
+
+If we pull from registry it may take more than 300sec , so to increase the time use --timeout flag. 
+helm install release-name chart-name --atomic --timeout 10m10s
+
+###################################################
+
+lec 10 
+Helm --namespace flag
+
+By default all resource create in "default" namespace which is default configured. 
+Setting the namespace preference
+kubectl config set-context --current --namespace=<insert-namespace-here>
+# Validate it
+kubectl config view --minify | grep namespaces:
+
+for more info namespace refer: 
+https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+
+
+
+# Create chart
+helm create chart-name
+# Create release
+helm install release-name chart-name 
+# check release
+helm list --output=yaml
+
+# Create namespace 
+kubectl create namespace <<namespace-name>>
+# check namespace/ns
+kubectl get ns 
+
+# Create release in project namespace
+helm install release-name chart-name --namespace <project-namespace>
+
+# To check in project namespace
+helm list -n <project-namespace>
+OR
+helm list --namespace <project-namespace>
+
+# Create namespace while creating release
+helm install release-name chart-name --namespace <project-02-namespace> --create-namespace
+
+# Validate ns 
+kubectl get ns
+
+# check status in project-02 namespace
+helm status release-name --show-resources --namespace <project-02-namespace 
+
+# upgrade release in project-02 namespace
+helm upgrade release-name chart-name --namespace <project-02-namespace>
+
+# uninstall release in project-02 namespace
+helm uninstall release-name chart-name --namespace <project-02-namespace>
+
+# To delete namespace
+kubectl delete ns <namespace-name>
+# Validate 
+kubectl get ns
