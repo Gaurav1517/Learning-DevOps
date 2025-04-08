@@ -1556,3 +1556,260 @@ vim main.yaml
           state: latest
 
 ansible-playbook main.yaml 
+
+############################################################
+lecture 27 
+ansible Define variable on the basis of group name in inventory file 
+vim /etc/ansible/hosts
+[web]
+192.168.157.149
+
+[dev]
+192.168.157.151
+
+[web:vars]
+mydir=/tmp/group-var-inv-dir-web
+myfile=/etc/passwd
+mykg=httpd,nfs-utils,tree
+
+[dev:vars]
+mydir=/tmp/group-var-inv-dir-dev
+myfile=/etc/shadow
+mykg=httpd,samba,tree
+
+vim playbook.yaml
+- name: Running task on all group
+  hosts: all                     # all means web, dev group 
+  tasks: 
+     - name: " create directory  {{ mydir }} "
+       file: 
+         path: "{{ mydir }}"
+         state: directory 
+
+     - name: copy file from {{ myfile }} to {{ mydir }}"
+       copy:
+          src: "{{ myfile }}"
+          dest:  "{{ mydir }}"
+          owner: aws
+          group: azure
+          mode: 0770
+
+     - name: " install some packages {{ mypkg }}"
+       yum: 
+          name: "{{ mypkg }}"
+          state: latest
+
+ansible-playbook playbook.yaml
+
+******* Interview question *********
+Define variable in inventory file 
+/etc/ansible/hosts
+
+i have define variable in host base Infront of Ip's and group based which has higher priority 
+
+[web]
+192.168.157.149 
+
+[dev]
+192.168.157.151
+
+[web:vars]
+mydir=/tmp/group-var-inv-dir-web
+myfile=/etc/passwd
+mykg=httpd,nfs-utils,tree
+
+[dev:vars]
+mydir=/tmp/group-var-inv-dir-dev
+myfile=/etc/shadow
+mykg=httpd,samba,tree
+
+
+Ans:
+It will give host variable priority  first then group based. 
+
+###################################################
+lec 28 
+Ansible Variable 
+without ssh -key with user password run ansible playbook 
+Allow in /etc/ansible/ansible.cfg  file 
+
+PARAMTER ALLOW OR UNCOMMENT 
+	ask_pass = True
+	remote_user  = root
+
+
+anible-playbook playbook-name.yaml 
+
+Define user name password as a variable in inventory file host.
+
+vim /etc/ansible/hosts
+[web]
+192.168.157.149 ansible_ssh_user=<<username>> ansible_ssh_pass=<<password>> ansible_ssh_port=22
+
+[dev]
+192.168.157.151 ansible_ssh_user=<<username>> ansible_ssh_pass=<<password>> ansible_ssh_port=22
+
+
+Define user name password as a variable in inventory file as group .
+[web:vars]
+ansible_ssh_user=<<username>> 
+ansible_ssh_pass=<<password>>
+ansible_ssh_port=22
+
+[dev:vars]
+ansible_ssh_user=<<username>>
+ansible_ssh_pass=<<password>>
+ansible_ssh_port=22
+
+Interview question 
+If we have define username and password as variable in inventory file as host variable  and group variable, so which has higher priority . 
+
+Ans: it give host priority first  and then group . 
+
+###################################################
+lec -29
+Ansible Simple loop 
+
+ansible all --list-hosts
+ansible all -m ping
+
+vim without-loop 
+
+- name: ansible playbook without loop , manual file
+  tasks:
+    - copy:
+         src: /etc/passwd
+	 dest: /tmp
+    - copy:
+	 src: /etc/group
+	 dest: /tmp
+    - copy:
+	 src: /etc/shadow
+	 dest: /tmp
+   - copy:
+	 src: /etc/gshadow
+	 dest: /tmp
+
+ansible-playbook all without-loop.yaml
+
+ansible playbook with loop 
+
+vim with_loop.yaml
+- name: ansible playbook without loop 
+  tasks:
+    - copy:
+         src: "{{ item }}"
+	 dest: /tmp
+      with_items:
+	 - /etc/passwd
+	 - /etc/group	
+         - /etc/shadow
+	 - /etc/gshadow
+
+ansible-playbook  with_loop.yaml
+
+
+##########################################################
+
+lec 30 
+Ansible simple loop
+
+	eg. 2
+vim loop-02.yaml
+
+- hosts: all
+  tasks:
+    - copy:
+         src: "{{ item }}"
+         dest: /tmp
+      with_items:
+         - /etc/passwd
+	 - /etc/group	
+         - /etc/shadow
+	 - /etc/gshadow
+
+   - file:
+        path: "{{ item }}"
+        state: directory 
+     with_items:
+          - /tmp/directory-1
+          - /tmp/directory-2
+          - /tmp/directory-3
+
+   - copy:
+        src: /etc/passwd
+        dest: "{{ item }}"
+     with_items:
+         - /tmp/directory-1
+         - /tmp/directory-2
+         - /tmp/directory-3
+
+
+ansible-playbook  loop-02.yaml
+
+###########################################################
+lec 31
+Ansible simple loop with variables
+eg. 3 
+
+- hosts: all 
+  vars:
+     mydir:
+        - /tmp/directory-1
+        - /tmp/directory-2
+        - /tmp/directory-3
+    
+    myfile:
+        - /etc/passwd
+        - /etc/group
+        - /etc/shadow
+        - /etc/gshadow
+
+  tasks:
+      - copy:
+         src: "{{ item }}"
+         dest: /tmp
+      with_items:
+         -  "{{  myfile }}"
+
+   - file:
+        path: "{{ item }}"
+        state: directory 
+     with_items:
+          -  "{{ mydir  }}"
+
+   - copy:
+        src: /etc/passwd
+        dest: "{{ item }}"
+     with_items:  "{{ mydir }}"  # we can also call var like this
+
+###########################################################
+lec 32 
+Ansible simple loop 
+eg. 4 
+
+- hosts: all
+  tasks:
+     -  yum: 
+           name: " {{ item }}"    
+           state: installed
+        with_items:
+           - ftp
+           - httpd
+           - vsftpd
+           - nfs-utils
+
+NOTE: Yum module doesn't require loop 
+without loop yum module eg. 
+
+- hosts: all
+  tasks:
+     -  yum: 
+           name: 
+              - ftp
+              - httpd
+              - vsftpd
+              - nfs-utils
+           state: installed
+
+###########################################################
