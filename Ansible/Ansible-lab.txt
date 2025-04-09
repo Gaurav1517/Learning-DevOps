@@ -1813,3 +1813,261 @@ without loop yum module eg.
            state: installed
 
 ###########################################################
+lec 33
+Ansible Nested loop 
+
+ vim nested-loop.yaml
+- name: "Nested loop eg.- 01"
+  hosts: dev
+  tasks:
+    - name: "copy files from {{ item[0] }} to {{ item[1] }}"
+      copy:
+        src: "{{ item[0] }}"
+        dest: "{{ item[1] }}"
+      with_nested:
+        - [ '/etc/passwd', '/etc/group', '/etc/shadow' ]
+        - [ '/tmp', '/tmp/test1', '/tmp/test2' ]
+
+[root@centos-master loop]# ansible-playbook nested-loop.yaml
+
+PLAY [Nested loop eg.- 01] *********************************************************************************************
+
+TASK [Gathering Facts] *************************************************************************************************
+ok: [192.168.157.151]
+
+TASK [copy files from {{ item[0] }} to {{ item[1] }}] ******************************************************************
+changed: [192.168.157.151] => (item=['/etc/passwd', '/tmp'])
+changed: [192.168.157.151] => (item=['/etc/passwd', '/tmp/test1'])
+changed: [192.168.157.151] => (item=['/etc/passwd', '/tmp/test2'])
+changed: [192.168.157.151] => (item=['/etc/group', '/tmp'])
+changed: [192.168.157.151] => (item=['/etc/group', '/tmp/test1'])
+changed: [192.168.157.151] => (item=['/etc/group', '/tmp/test2'])
+changed: [192.168.157.151] => (item=['/etc/shadow', '/tmp'])
+changed: [192.168.157.151] => (item=['/etc/shadow', '/tmp/test1'])
+changed: [192.168.157.151] => (item=['/etc/shadow', '/tmp/test2'])
+
+PLAY RECAP *************************************************************************************************************
+192.168.157.151            : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+Same task with variables
+ var-nested-loop.yaml
+- name: "Nested loop with variables "
+  hosts: dev
+  vars:
+    myfile:
+      - /etc/passwd
+      - /etc/group
+      - /etc/shadow
+      - /etc/gshadow
+    mydir:
+      - /tmp
+      - tmp/test1
+      - tmp/test2
+  tasks:
+    - name: copy files
+      copy:
+        src: "{{ item[0] }}"
+        dest: "{{ item[1] }}"
+      with_nested:
+        - "{{ myfile }}"
+        - "{{ mydir }}"
+[root@centos-master loop]# ansible-playbook var-nested-loop.yaml
+
+################################################ 
+
+lec 34
+
+Ansible nested loop 
+eg. 2 
+vim nested-loop-eg.yaml
+- hosts: dev
+  vars:
+     myfile:
+        - /etc/passwd
+        - /etc/group
+        - /etc/shadow
+  tasks:
+    - copy:
+         src: "{{ myfile[0] }}"
+         dest: "{{ item[1] }}"
+      with_nested:
+         - /tmp
+         - /tmp/test1
+         - /tmp/test2
+
+########################################################
+
+lec 35
+Ansible Hash loop 
+
+
+/etc/passwd  copy to /tmp
+/etc/group copy to  /tmp/test01
+/etc/shadow copy to  /tmp/test02
+
+# manually way 
+vim manuall.yaml 
+- hosts: dev
+  tasks:
+     - copy:
+          src: /etc/passwd
+          dest: /tmp
+    - copy:
+          src:  /etc/group
+          dest: /tmp/test01
+    - copy:
+          src: /etc/shadow
+          dest: /tmp/test02
+
+
+# simple loop 
+vim simple-loop.yaml 
+- hosts: dev
+  tasks:
+     - copy:
+          src: "{{ item }}"
+          dest: /tmp
+       with_items:
+          - /etc/passwd
+    - copy:
+          src: "{{ item }}"
+          dest: /tmp/test01
+       with_items:
+          - /etc/group
+    - copy:
+          src: "{{ item }}"
+          dest: /tmp/test02
+       with_items:
+          - /etc/shadow
+
+`
+# with hash loop 
+
+vim hash-loop.yaml
+- name: hash loop eg.
+  hosts: dev
+  tasks:
+    - name: copy files base on hash loop
+      copy:
+        src: "{{ item.a }}"
+        dest: "{{ item.b }}"
+      with_items:
+        - { a: '/etc/passwd', b: '/tmp' }
+        - { a: '/etc/group',  b: '/tmp/test01' }
+        - { a: '/etc/shadow', b: '/tmp/test02' }
+
+[root@centos-master loop]# ansible-playbook hash-loop.yaml
+
+PLAY [hash loop eg.] ****************************************************************************************
+
+TASK [Gathering Facts] **************************************************************************************
+ok: [192.168.157.151]
+
+TASK [copy files base on hash loop] *************************************************************************
+changed: [192.168.157.151] => (item={'a': '/etc/passwd', 'b': '/tmp'})
+changed: [192.168.157.151] => (item={'a': '/etc/group', 'b': '/tmp/test01'})
+changed: [192.168.157.151] => (item={'a': '/etc/shadow', 'b': '/tmp/test02'})
+
+PLAY RECAP **************************************************************************************************
+192.168.157.151            : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+# Validate it . 
+[root@centos-worker-02 tmp]# tree /tmp
+/tmp
+├── passwd
+├── test01
+│   └── group
+└── test02
+    └── shadow
+
+2 directories, 3 files
+
+
+
+
+###########################################################
+
+lec 36 
+Ansible hash loop 
+
+Add these user's to this particular group using hash loop 
+harry          to  dev-grp
+natasha      to test-grp
+sarah          to prod-grp 
+
+
+firstly need to create groups 
+then assign groups to users
+
+# without variable 
+- name: "Hash loop task-01 Create users with particular group"
+  hosts: dev
+  vars:
+    groups:
+      - dev-grp
+      - test-grp
+      - prod-grp
+  tasks:
+    - name: "Create group's {{ item }}"
+      group:
+        name: "{{ item }}"
+        state: present
+      with_items: "{{ groups }}"
+
+    - name: "Create users and assign to groups "
+      user:
+        name: "{{ item.user }}"
+        groups: "{{ item.group }}"
+        state: present
+      with_items:
+       - { user: 'harry',   group: 'dev-grp' }
+       - { user: 'natasha', group: 'test-grp' }
+       - { user: 'shara',   group: 'prod-grp' }
+
+# with variable 
+vim hash-task01.yaml
+- name: "Hash loop task-01 Create users with particular group"
+  hosts: dev
+  vars:
+    users_groups:
+       - { user: 'harry',   group: 'dev-grp' }
+       - { user: 'natasha', group: 'test-grp' }
+       - { user: 'shara',   group: 'prod-grp' }
+  tasks:
+    - name: "Create group's {{ item.group }}"
+      group:
+        name: "{{ item.group }}"
+        state: present
+      loop: "{{ users_groups }}"
+    - name: "Create users and assign to groups "
+      user:
+        name: "{{ item.user }}"
+        groups: "{{ item.group }}"
+        state: present
+      loop: "{{ users_groups }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+[root@centos-master loop]# ansible-playbook hash-task01.yaml
+
+PLAY [Hash loop task-01 Create users with particular group] *************************************************
+
+TASK [Gathering Facts] **************************************************************************************
+ok: [192.168.157.151]
+
+TASK [Create group's {{ item.group }}] **********************************************************************
+changed: [192.168.157.151] => (item={'user': 'harry', 'group': 'dev-grp'})
+changed: [192.168.157.151] => (item={'user': 'natasha', 'group': 'test-grp'})
+changed: [192.168.157.151] => (item={'user': 'shara', 'group': 'prod-grp'})
+
+TASK [Create users and assign to groups] ********************************************************************
+changed: [192.168.157.151] => (item=harry)
+changed: [192.168.157.151] => (item=natasha)
+changed: [192.168.157.151] => (item=shara)
+
+PLAY RECAP **************************************************************************************************
+192.168.157.151            : ok=3    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+########################################################################################################
+
