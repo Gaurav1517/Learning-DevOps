@@ -2071,3 +2071,423 @@ PLAY RECAP *********************************************************************
 
 ########################################################################################################
 
+lec 37 
+Ansible Facts
+
+What Are Ansible Facts?
+
+Ansible facts are pieces of information that Ansible automatically gathers about your system (like hostname, IP address, OS version, memory, etc.) before running a playbook.
+
+Think of it like this:
+
+    📦 Ansible checks the system it's going to manage and collects details about it. These details are called facts.
+
+
+Which Module Gathers Facts in Ansible?
+
+Ansible uses the setup module to gather system information (facts).
+
+So when you run a playbook or a command like:
+
+ansible all -m setup
+
+You're explicitly using the setup module, which collects all the facts from the target machines.
+🔹 How It Works in a Playbook
+
+By default, when you run a playbook, Ansible runs the setup module at the beginning — unless you turn it off.
+
+Here’s an example of calling it manually:
+
+- name: Gather system facts
+  hosts: all
+  tasks:
+    - name: Get all facts
+      setup:
+
+You can also filter facts to get only what you need, like:
+
+- name: Get only network-related facts
+  setup:
+    filter: "ansible_eth*"
+
+🔹 Summary
+Module Name	Purpose
+setup	Gathers system facts (like OS, IP, CPU, memory, etc.)
+
+
+To save the information in files
+ansible all -m setup --tree /file-path/to/file-name
+
+to filter information 
+ansible all -m setup -a 'filter=ansible_all_ipv6_addresses'
+ansible all -m setup -a 'filter=ansible_architecture'
+ansible all -m setup -a 'filter=ansible_bios_version'
+ansible all -m setup -a 'filter=ansible_default_ipv4'
+ansible all -m setup -a 'filter=ansible_distribution'
+ansible all -m setup -a 'filter=ansible_dns'
+ansible all -m setup -a 'filter=ansible_kernel'
+ansible all -m setup -a 'filter=ansible_mounts'
+ansible all -m setup -a 'filter=ansible_python_version'
+ansible all -m setup -a 'filter=ansible_virtualization_type'
+
+ansible all -m setup -a 'filter=ansible_mounts' | grep -i device
+ansible all -m setup -a 'filter=ansible_mounts' | grep -i mount
+ansible all -m setup -a 'filter=ansible_mounts' | grep -i fstype
+
+########################################################
+
+lec 38
+Ansible facts part-2 
+
+Custom facts
+🔹 What Are Custom Facts?
+
+Custom facts are user-defined pieces of information that Ansible can read just like regular facts. These can be used to store anything you want — like:
+
+    Environment type (dev, test, prod)
+
+    Special config values
+
+    Software versions
+
+    Anything specific to your setup
+
+Note: whenever we run playbook it automatically gather facts before task execution . 
+We can disable gather facts below hosts define "gather_facts: false OR gather_facts: no "
+
+
+🔹 How to Create Custom Facts
+
+Ansible reads custom facts from files in:
+
+/etc/ansible/facts.d/
+
+You can create a custom .fact file in JSON, INI, or executable script format.
+✅ Example: JSON Format Custom Fact
+
+Create a file on the managed host (not controller):
+
+sudo mkdir -p /etc/ansible/facts.d
+sudo nano /etc/ansible/facts.d/custom_facts.fact
+
+[worker-node-01]
+apache = 4.5.6
+kernel = 3.2
+disk = 10GB
+RAM = 32 GB
+
+ansible all -m setup -a 'filter=ansible_local'
+ansible all -m setup -a 'filter=ansible_local' | grep -i kernel
+
+
+
+Content (JSON):
+
+{
+  "env": "production",
+  "owner": "DevOps Team"
+}
+
+Make sure it's readable:
+
+sudo chmod +x /etc/ansible/facts.d/custom_facts.fact
+
+🔹 Accessing Custom Facts in a Playbook
+
+- name: Show custom facts
+  hosts: all
+  tasks:
+    - name: Print custom environment
+      debug:
+        msg: "This is the {{ ansible_local.custom_facts.env }} environment"
+
+Output:
+
+This is the production environment
+
+🔹 Summary
+Step	What to Do
+1️⃣	Create folder: /etc/ansible/facts.d/
+2️⃣	Add a .fact file in JSON/INI/script
+3️⃣	Access it in playbooks using ansible_local.<fact_file>.<key>
+
+
+########################################################
+lec 39 
+Ansible Conditional Statemaent
+In Ansible, conditional statements are typically used to control task execution based on variables, facts, or the outcome of previous tasks. This is mainly done using the when keyword.
+✅ Basic conditional using a variable:
+
+- name: Install Nginx if OS is Ubuntu
+  apt:
+    name: nginx
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+
+Use Case: Installing packages based on OS type
+Other common use cases:
+
+
+    ✅ Run a task only if a file exists
+
+    ✅ Skip tasks for certain hosts
+
+    ✅ Restart a service only if the config changed
+
+    ✅ Run cleanup tasks only if a flag is set
+
+    ✅ Set different values or files based on environment (dev, test, prod)
+
+In Ansible, conditional statements mostly revolve around the when keyword, but you can use it in different ways depending on the type of condition you’re checking.
+
+Here are the main types of conditional statements in Ansible:
+🔹 1. Boolean conditions
+
+Check if a variable is true or false.
+
+when: my_flag == true
+
+Or shorter:
+
+when: my_flag
+
+🔹 2. String comparison
+
+Compare text values.
+
+when: my_var == "production"
+
+🔹 3. Numeric comparison
+
+Compare numbers (equal to, less than, greater than, etc.)
+
+when: some_number > 10
+when: some_value | int <= 5
+
+🔹 4. List membership
+
+Check if a value is in a list.
+
+when: "'nginx' in installed_packages"
+
+🔹 5. File or command result (using registered variables)
+
+Check results from earlier tasks.
+
+- name: Check if file exists
+  stat:
+    path: /etc/myconfig.conf
+  register: myfile
+
+- name: Run only if file exists
+  debug:
+    msg: "File found!"
+  when: myfile.stat.exists
+
+🔹 6. Multiple conditions (AND/OR)
+
+Run a task if all or any conditions are met.
+
+# AND condition
+when:
+  - env == "production"
+  - app_installed == true
+
+# OR condition
+when: env == "dev" or env == "test"
+
+🔹 7. Negation (NOT)
+
+Run a task unless a condition is true.
+
+when: my_var != "test"
+
+Or:
+
+when: not my_flag
+
+🔹 8. Using Ansible facts
+
+Facts about the system (like OS, IP, etc.)
+
+when: ansible_facts['distribution'] == "Ubuntu"
+
+Each type lets you control when and how tasks run, making your playbooks smarter and more dynamic.
+
+lab
+
+Conditional Operator
+==
+!<
+<
+>
+<=
+>=
+and 
+or
+
+By default setup module is running at background in from there we fetch the information . 
+
+eg. 01
+vim equal-to-operator.yaml
+- name: Conditional statement
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution == "CentOS"
+        when: ansible_distribution_major_version == "7"  
+        when: ansible_kernel == "3.10.0.-1062.el7.x86_64" # it give higher preference to last define value. 
+
+
+ ansible-playbook conditional.yaml
+
+#####################################################
+
+lec 40
+Ansible Conditionals
+Not Equal to operator (!=)
+
+vim not-equal-to-operator.yaml
+- name: "NOT equal to operator"
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution != "CentOS"
+
+
+#######################################################
+lec 41
+Ansible Conditionals
+Less than operator (<)
+
+vim less-than-operator.yaml
+- name: Less than operator
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution_major_version < "7"  
+
+It will run all machine where all version less than 7  like 6,5,4,3,..
+
+Less than equal to  operator (<=)
+
+vim less-than-equal-to-operator.yaml
+- name: Less than equal to operator
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution_major_version <= "7"  
+
+It will run all machine where all version less than 7  like including 7, because less than equal to operator is defined. 
+
+Greater than operator (>)
+
+vim greater-than-operator.yaml
+- name: Greater than operator
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution_major_version > "7"  
+
+It will run all machine where all version greater than 7  like 8,9,10..
+
+Greater than and equal operator (<)
+
+vim greater-than-equal-operator.yaml
+- name: Greater than Equal operator
+  hosts: dev
+  tasks:
+     - name: "install httpd if distro ubuntu"
+        yum:
+          name: httpd
+          state: installed
+        when: ansible_distribution_major_version >= "7"  
+
+It will run all machine where all version greater than 7  like including 7. because greater than equal to operator is defined. 
+
+########################################################
+
+lec 42
+Ansible Conditionals  and Or opertor
+Note:
+In And operator both condition must be true then it will execute. 
+
+ Operator (and)
+
+vim and-operator.yaml
+- name: Add operator
+  hosts: dev
+  tasks:
+    - name:  "install httpd "
+      yum: 
+         name: httpd
+         state: installed
+      when: ansible_distribution_major_version == "7" and ansible_distribution == "CentOS"
+
+ansible-playbook  and-operator.yaml
+
+
+
+Or operator 
+
+In or operator any of the condition match it will exeute. 
+
+vim or-operator.yaml
+- name: "OR operator"
+  hosts: dev
+  tasks:
+    - name: "Installing httpd"
+      yum:
+          name: httpd
+          state: installed
+      when: (ansible_distribution_majr_version == "7"  or ansible_distribution == "CentOS") 
+
+And OR operator 
+vim and-or-operator.yaml
+- name: "AND - OR operator"
+  hosts: dev
+  tasks:
+    - name: "Installing httpd"
+      yum:
+          name: httpd
+          state: installed
+      when: (ansible_distribution_majr_version == "7"  or ansible_distribution == "CentOS") and (ansible_distribution_majr_version == "23"  or ansible_distribution == "Ubuntu")
+
+###########################################################
+
+lec 43
+Ansible Condition 
+Gather facts from the worker nodes
+Stat module 
+	Retrieves facts for a file similar to the Linux/Unix 'stat' command. For Windows targets, us the [ansible.windows.win_stat] module instead. 
+The `stat` module in Ansible is used to retrieve file or directory metadata on a target hosts. 
+It's useful when you want to check if a file or directory exists, get permission stamps, or other attributes before performing an action. 
+
+Check doc
+ansible-doc stat
+
+
+- name: Stat module with conditionals
+  hosts: dev
+  tasks:
+     - name: "Stat module to check file "
+       stat:
+           path: /tmp/test-file
+       register: file_stat
+
