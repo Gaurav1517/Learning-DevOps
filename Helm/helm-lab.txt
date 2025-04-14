@@ -512,3 +512,164 @@ helm uninstall release-name chart-name --namespace <project-02-namespace>
 kubectl delete ns <namespace-name>
 # Validate 
 kubectl get ns
+
+##########################################################################################################
+lec 11
+Helm get command 
+
+helm get --help 
+
+Available commands:
+all  download all information for a named release
+hooks      download all the hooks for a named release
+manifest   download the manifest for a named release
+metadata  This command fetches metadata for a given release
+notes       download the notes for a named release
+values      download the values file for a named release
+
+
+Create chart 
+helm create chart-name
+Create release
+helm install release-name chart-name --atomic
+list release
+helm list --output=yaml 
+
+Upgrade the release 
+use --set attribute to override the default values define in chart-name/values.yaml file 
+helm upgrade release-name chart-name --atomic --set "image.tag=1.14.0"
+helm upgrade release-name chart-name --atomic --set replicaCount=10
+helm upgrade release-name chart-name --atomic --set service.type=NodePort
+helm upgrade release-name chart-name --atomic --set "image.tag=1.20.0"
+helm upgrade release-name chart-name --atomic --set replicaCount=30
+
+helm list 
+helm history release-name 
+#  to see change in every revision
+helm get values release-name --revision 6
+helm get values release-name --revision 5
+helm get values release-name --revision 4
+helm get values release-name --revision 3
+helm get values release-name --revision 2
+helm get values release-name --revision 1
+
+
+# upgrade through custom values.yaml file 
+for now just copy the values.yaml to custom-values.yaml 
+cp chart-name/values.yaml  /root/
+change in file 
+	replicaCount: 40
+
+        tag: 1.23.0
+        service:
+             type: NodePort
+
+helm list 
+helm upgrade  release-name chart-name -f /root/custom-values.yaml   
+OR
+helm upgrade  release-name chart-name --values /root/cusom-values.yaml
+
+We can also override the values like this 
+helm upgrade  release-name chart-name -f /root/custom-values.yaml --set "image.tag=1.24.0"
+
+#Validate it
+helm list
+helm history release-name --output
+helm get values release-name --revision 8 
+helm status release-name --show-resources 
+
+While upgrading/creation/status we get some NOTES
+we get this NOTES from chart-name/template/NOTES.txt
+
+	1. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "mychart.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch its status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "mychart.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "mychart.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "mychart.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+{{- end }}
+
+To get manifest file of the release
+helm get manifest release-name 
+
+To get metadata of the release
+helm get metadata release-name 
+
+To get hooks of the release
+helm get hooks release-name 
+
+To get all from release
+helm get all release-name 
+
+
+#################################################
+Lecture 12
+Helm Chart .helmignore, notes.txt, _helper.tpl 
+
+While creating chart we get some hidden files
+# Create chart
+helm create chart-name
+
+# Check all file including hidden 
+ls -la mychart/
+total 16
+drwxr-xr-x. 4 root root   93 Apr  2 00:23 .
+drwxr-xr-x. 3 root root   45 Apr  2 00:56 ..
+drwxr-xr-x. 2 root root    6 Apr  2 00:21 charts
+-rw-r--r--. 1 root root 1143 Apr  2 00:21 Chart.yaml
+-rw-r--r--. 1 root root  349 Apr  2 00:21 .helmignore
+drwxr-xr-x. 3 root root  162 Apr  2 00:21 templates
+-rw-r--r--. 1 root root 4293 Apr  2 00:21 values.yaml
+
+
+.helmignore
+
+The .helmignore file is used in Helm charts to specify files and directories that should be excluded from being packaged when running the helm package command or when installing/upgrading a Helm release. It acts like .gitignore file , telling helm which files to ignore during packaging and deployment. 
+
+Use case for .helmignore
+	1. Excluding Deployement files. 
+	2. Reducing Chart Size
+	3. Preventing Sensitive Information from Being Packaged. 
+
+
+vim mychart/.helmignore
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.vscode/
+
+
