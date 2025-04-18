@@ -411,8 +411,8 @@ ansible web -m copy -a 'src=/etc/passwd dest=/tmp'
 ansible web -m command -a 'ls -l /tmp/passwd'
 
 # Task to create two user "aws" & "azure" on ansible-worker-nodes, copy /etc/group file with owner=aws group=azure mode='0777' in /tmp directory .
-useradd -m -s /bin/bash aws && echo "aws:aws" | sudo chpasswd 
-useradd -m -s /bin/bash azure && echo "azure:azure" | sudo chpasswd
+useradd -m -s /bin/bash aws && echo "aws:password" | sudo chpasswd 
+useradd -m -s /bin/bash azure && echo "azure:password" | sudo chpasswd
 # Verify user 
 id aws
 id azure
