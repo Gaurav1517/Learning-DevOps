@@ -2957,3 +2957,231 @@ harry@192.168.95.130: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,
 
 ####################################################################################
 
+lec 46 
+Ansible Tag
+
+Ansible Tag is a way to organize and control which parts of your automation tasks should run in Ansible . 
+
+When you use tags, you can label certain parts of your Ansible playbook ( like a tasks or a group of tasks) with specific name (tags). Then, when you run your playbook , you can tell Ansible to only run the tasks that have a specific tag, instead of running the whole playbook. 
+
+Syntax to define tags in playbook 
+
+tasks:
+  - name: install httpd package
+    yum: 
+      name: httpd 
+      state: installed
+    tags: dev-team
+  
+  - name: create file
+    file:
+       path: /tmp/test-file.txt
+       state: touch
+    tags: test-team
+
+To run dev-team tag
+ansible-playbook playbook.yaml --tags dev-team 
+
+eg. 
+vim tag.yaml
+- name: Ansible Tag
+  hosts: web
+  tasks:
+    - name: copy file
+      copy:
+        src: /etc/passwd
+        dest: /tmp
+      tags: dev-team
+
+    - name: create directory
+      file:
+        path: /tmp/test-dir
+        state: directory
+      tags: test-team
+
+    - name: install httpd package
+      yum:
+        name: httpd
+        state: installed
+      tags: prod-team
+
+    - name: service start & enable httpd
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+      tags: admin-team
+[root@worker-01 ansible]# ansible-playbook tag.yaml --tag=dev-team
+
+PLAY [Ansible Tag] *****************************************************************************************************
+
+TASK [Gathering Facts] *************************************************************************************************
+ok: [192.168.95.130]
+
+TASK [copy file] *******************************************************************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP *************************************************************************************************************
+192.168.95.130             : ok=2    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+[root@worker-01 ansible]# ansible web -m command -a "ls -lh /tmp/"
+192.168.95.130 | CHANGED | rc=0 >>
+total 4.0K
+drwx------. 2 root root   56 Apr 19 21:30 ansible_ansible.legacy.command_payload_e_a2ky_v
+-rw-r--r--. 1 root root 2.0K Apr 19 21:29 passwd
+
+
+To run an Ansible playbook with multiple tags, you can simply separate the tags with a comma, without spaces between them.
+
+[root@worker-01 ansible]# ansible-playbook tag.yaml --tag="dev-team,test-team"
+
+PLAY [Ansible Tag] ************************************************************************
+
+TASK [Gathering Facts] ********************************************************************
+ok: [192.168.95.130]
+
+TASK [copy file] **************************************************************************
+changed: [192.168.95.130]
+
+TASK [create directory] *******************************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP ********************************************************************************
+192.168.95.130             : ok=3    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+--skip-tag
+it will run all tasks defined in playbook accept --skip-tag="tag-name-defined"
+
+Let's dev-team  tag in the same playbook  tag.yaml 
+
+[root@worker-01 ansible]# ansible-playbook tag.yaml --skip-tag=dev-team
+
+PLAY [Ansible Tag] *****************************************************************************************************
+
+TASK [Gathering Facts] *************************************************************************************************
+ok: [192.168.95.130]
+
+TASK [create directory] ************************************************************************************************
+changed: [192.168.95.130]
+
+TASK [install httpd package] *******************************************************************************************
+changed: [192.168.95.130]
+
+TASK [service start & enable httpd] ************************************************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP *************************************************************************************************************
+192.168.95.130             : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+[root@worker-01 ansible]# ansible web -m raw -a "ls -lh /tmp/; dnf list installed httpd; systemctl is-active httpd"
+192.168.95.130 | CHANGED | rc=0 >>
+total 4.0K
+-rw-r--r--. 1 root root 2.0K Apr 19 21:29 passwd
+drwx------. 3 root root   17 Apr 19 21:33 systemd-private-4116c151def64e9ebf5b04c9a2d6e6fc-httpd.service-k7aj62
+drwxr-xr-x. 2 root root    6 Apr 19 21:33 test-dir
+Updating Subscription Management repositories.
+Installed Packages
+httpd.x86_64         2.4.62-1.el9_5.2          @rhel-9-for-x86_64-appstream-rpms
+active
+Shared connection to 192.168.95.130 closed.
+
+
+To Skip multiple tags tasks
+[root@worker-01 ansible]# ansible-playbook tag.yaml --skip-tag="prod-team,admin-team"
+
+PLAY [Ansible Tag] ************************************************************************
+
+TASK [Gathering Facts] ********************************************************************
+ok: [192.168.95.130]
+
+TASK [copy file] **************************************************************************
+changed: [192.168.95.130]
+
+TASK [create directory] *******************************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP ********************************************************************************
+192.168.95.130             : ok=3    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+Running multiple tags but excluding some:
+If you want to run tasks with web and db, but exclude tasks tagged db, you could combine --tags and --skip-tags:
+
+ansible-playbook playbook.yaml --tags="web" --skip-tags="db"
+
+     
+
+#################################################################
+lec 47 
+Ansible Ignore errors 
+
+In Ansible , the ignore_errors directive allows you to continue running a playbook even if a particular tasks fails. But default, when a tasks fails, Ansible stop executing the remaning tasks. However if you want Ansible to proceed with rest of the tasks, even when one fails , you can use ignore_errors: yes
+
+When to use ignore_errors:
+When you know a task might fail, but you still want the playbook to continue (like when installing packages that may not be available on every host).
+
+When a failure in one task is not critical and doesn't impact the overall result of the playbook.
+
+eg. 
+vim ignore_error.yaml
+- name: ignore_errors
+  hosts: web
+  gather_facts: false
+  tasks:
+    - name: copy file
+      copy:
+        src: /etc/group1  # create manual error, no such file exists
+        dest: /tmp
+      ignore_errors: yes
+
+    - name: create directory
+      file:
+        path: /tmp/test-dir
+        state: directory
+
+    - name: install package httpd
+      yum:
+        name: httpd
+        state: installed
+
+    - name: service start & enable httpd
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+
+[root@worker-01 ansible]# ansible-playbook ignore_error.yaml
+
+PLAY [ignore_errors] **********************************************************************
+
+TASK [copy file] **************************************************************************
+An exception occurred during task execution. To see the full traceback, use -vvv. The error was: If you are using a module and expect the file to exist on the remote, see the remote_src option
+fatal: [192.168.95.130]: FAILED! => {"changed": false, "msg": "Could not find or access '/etc/group1' on the Ansible Controller.\nIf you are using a module and expect the file to exist on the remote, see the remote_src option"}
+...ignoring
+
+TASK [create directory] *******************************************************************
+changed: [192.168.95.130]
+
+TASK [install package httpd] **************************************************************
+ok: [192.168.95.130]
+
+TASK [service start & enable httpd] *******************************************************
+ok: [192.168.95.130]
+
+PLAY RECAP ********************************************************************************
+192.168.95.130             : ok=4    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=1
+
+
+[root@worker-01 ansible]# ansible web -m raw -a "ls -lh /tmp/; dnf list installed httpd; systemctl is-active httpd"
+192.168.95.130 | CHANGED | rc=0 >>
+total 0
+drwxr-xr-x. 2 root root 6 Apr 19 21:56 test-dir
+Updating Subscription Management repositories.
+Installed Packages
+httpd.x86_64         2.4.62-1.el9_5.2          @rhel-9-for-x86_64-appstream-rpms
+active
+Shared connection to 192.168.95.130 closed.
+
+###############################################################################################
+
