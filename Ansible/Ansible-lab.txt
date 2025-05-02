@@ -3185,3 +3185,349 @@ Shared connection to 192.168.95.130 closed.
 
 ###############################################################################################
 
+lec 48 
+Ansible rescue, block, & always 
+In Ansible, the block is way to group tasks together so that they can be treated as a single unit for error handling and conditional execution . When using blocks, you can use also define tasks to run always  after the block, whether the tasks within  the block succeed or fail. This  is done using block: always directive. 
+
+eg. 
+
+vim rescue-block.yaml
+- name: rescue block always eg.
+  hosts: web
+  gather_facts: false
+  vars:
+    myfile: /tmp/test-file.txt
+  tasks:
+    - name: Try to append line, rescue if fails, always install httpd
+      block:
+        - name: Append line in block
+          lineinfile:
+            path: "{{ myfile }}"
+            line: "Appending content with block"
+      rescue:
+        - name: Touch file in rescue
+          file:
+            path: "{{ myfile }}"
+            state: touch
+        - name: Append line in rescue
+          lineinfile:
+            path: "{{ myfile }}"
+            line: "Appending content with rescue"
+      always:
+        - name: Ensure httpd is installed
+          yum:
+            name: httpd
+            state: present
+
+[root@worker-01 ansible]# ansible-playbook  rescue-block.yaml
+
+PLAY [rescue block always eg.] **********************************************************
+
+TASK [Append line in block] *************************************************************
+fatal: [192.168.95.130]: FAILED! => {"ansible_facts": {"discovered_interpreter_python": "/usr/bin/python3"}, "changed": false, "msg": "Destination /tmp/test-file.txt does not exist !", "rc": 257}
+
+TASK [Touch file in rescue] *************************************************************
+changed: [192.168.95.130]
+
+TASK [Append line in rescue] ************************************************************
+changed: [192.168.95.130]
+
+TASK [Ensure httpd is installed] ********************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP ******************************************************************************
+192.168.95.130             : ok=3    changed=3    unreachable=0    failed=0    skipped=0    rescued=1    ignored=0
+
+
+[root@worker-01 ansible]# ansible web -m raw -a "cat /tmp/test-file.txt; dnf list installed httpd"
+192.168.95.130 | CHANGED | rc=0 >>
+Appending content with rescue
+Updating Subscription Management repositories.
+Installed Packages
+httpd.x86_64         2.4.62-1.el9_5.2          @rhel-9-for-x86_64-appstream-rpms
+Shared connection to 192.168.95.130 closed.
+
+#############################################################
+lec 49
+Ansible Vault
+
+Ansible Vault is a security feature in Ansible that lets you encrypt sensitive data like passwords, API keys or any secret information - so you don't  store them in plain text. 
+
+To encrypt simple txt file 
+Firstly create test.txt file . 
+cat <<EOF > test.txt
+> This is test file.
+> Ansible Vault test file.
+> EOF
+[root@worker-01 ansible]# cat test.txt
+This is test file.
+Ansible Vault test file.
+[root@worker-01 ansible]# ansible-vault encrypt test.txt
+New Vault password:
+Confirm New Vault password:
+Encryption successful
+[root@worker-01 ansible]# cat test.txt
+$ANSIBLE_VAULT;1.1;AES256
+38323733313662336562366166356638303262636534383436386334383235613463396465633165
+6537356332613962343262373038613465313835643264660a313365626431306339323831356136
+39383164633130616639616435653838656535636636623838376531626231373231306233643965
+3432666362333035660a633932343238313234376332383361373061376532323963333137666363
+36663661383361303361663738656533633133616231333536316239323538353331643833613939
+3333313136376137666263376235653539396634623230373935
+
+To read without decrypt ,but require password
+[root@worker-01 ansible]# ansible-vault view test.txt
+Vault password:
+This is test file.
+Ansible Vault test file.
+
+To edit without decrypt , but required password
+[root@worker-01 ansible]# ansible-vault edit test.txt
+Vault password:
+[root@worker-01 ansible]# ansible-vault view test.txt
+Vault password:
+This is test file.
+Ansible Vault test file.
+
+Appending  line after encrypt file with password.
+
+To create file with ansible-vault 
+ansible-vault create file2.txt
+New Vault password:
+Confirm New Vault password:
+[root@worker-01 ansible]# ansible-vault view file2.txt
+Vault password:
+This file is created by ansible-vault
+Syntax:
+        ansible-vault create file-name.txt
+
+To decrypt file with ansible-vault
+ ansible-vault decrypt file2.txt
+Vault password:
+Decryption successful
+[root@worker-01 ansible]# cat file2.txt
+This file is created by ansible-vault
+Syntax:
+        ansible-vault create file-name.txt
+
+eg. 
+Do encryption and run playbook 
+vim vault.yaml
+- name: Vault eg.
+  hosts: web
+  gather_facts: false
+  vars:
+    myfile: /etc/passwd
+    mydir: /tmp/test-dir
+  tasks:
+    - name: " Copy file from {{ myfile }} to /tmp "
+      copy:
+        src: "{{ myfile }}"
+        dest: /tmp
+    - name: " Create directory named {{ mydir }} "
+      file:
+        path: "{{ mydir }}"
+        state: directory
+[root@worker-01 ansible]# ansible-vault encrypt vault.yaml
+New Vault password:
+Confirm New Vault password:
+Encryption successful
+[root@worker-01 ansible]# cat vault.yaml
+$ANSIBLE_VAULT;1.1;AES256
+62353265653732353630353562616364343061633063646162333436313237303863623766613830
+6638646534313733646233323932626366363437366466370a323666656137353738313334626131
+62363062646563363664626330316235316263633032393332336230383561616635306234313430
+3032636336653561610a393663633136616163373565353238323462626633306339646237313738
+38663763663539336336636561393237383932333361623034636231396465613435663632363362
+32646432363065643737333139303738613061303536393738663866396631616361613835346431
+65303464393866323432313736333332343761653230326138383630656630386332396636316362
+35623934313338373762356231316536633537343633323862333661656533646631393534613065
+64646235336465306430653562623936623635636261383362343466393939373032363134353131
+31623434303139383934633264303339313261623534356436633734366137633637613435313732
+31393664663830613137313136326133323538656137316230393634326432303735396134303463
+61356632656338623138663334623663643632353965323932396530396132303331343831313032
+64363030336636383938353365633363633839383964613737653230366532353265306464316239
+36373462353763303636373639343533393061353633343464663431396639313834653134303836
+35303361323837623062326364323933663737343862313734616439393737383361643632623634
+30656464323337373961633762376263313539626166313139616234303939333330313337376239
+31386536373337373663653061336366383631636430386532633766613764303936386234643663
+36373962633262336237643038363339656330613738333530393566326639373161373365363731
+64303763363833306361663839363738393764366266666635363831643464343833393135393330
+31303037333338333864656337386261633638316262326338303063303130396137616262393463
+64343835343963343061663033646233376537626536303432613132346130353561
+[root@worker-01 ansible]# ansible-playbook vault.yaml
+ERROR! Attempting to decrypt but no vault secrets found
+[root@worker-01 ansible]# ansible-playbook vault.yaml --ask-vault-pass
+Vault password:
+
+PLAY [Valut eg.] *******************************************************************************************************
+
+TASK [Copy file from /etc/passwd to /tmp] ******************************************************************************
+changed: [192.168.95.130]
+
+TASK [Create directory named /tmp/test-dir] ****************************************************************************
+changed: [192.168.95.130]
+
+PLAY RECAP *************************************************************************************************************
+192.168.95.130             : ok=2    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+
+
+
+[root@worker-01 ansible]# ansible web -m raw -a 'ls -lh /tmp | grep "passwd\|test-dir"'
+192.168.95.130 | CHANGED | rc=0 >>
+-rw-r--r--. 1 root root 2.0K Apr 23 07:35 passwd
+drwxr-xr-x. 2 root root    6 Apr 23 07:35 test-dir
+Shared connection to 192.168.95.130 closed.
+
+To edit ansible-playbook without decrypt
+ansible-vault edit playbook-name.yaml
+password:
+
+To decrypt ansible-playbook 
+ansible-vault decrypt playbook.yaml
+
+To encrypt ansible host file
+ansible-vault encrypt /etc/ansible/hosts
+
+To run 
+ansible-vault playbook.yaml --ask-vault-pass 
+
+To change key (password)
+ansible-vault rekey file3.txt
+Vault password:
+New Vault password:
+Confirm New Vault password:
+Rekey successful
+
+######################################################
+lec 50
+Ansible Role Structure
+
+Ansible roles are a powerful way to organize and reuse automation code in a clean, scalable, and modular structure. 
+
+🧱 What is a Role in Ansible?
+A role is a collection of tasks, variables, files, templates, and handlers organized in a standard directory structure. Roles make it easy to reuse common configurations like installing a web server or configuring a database.
+
+✅ Benefits of Using Roles
+Modular and reusable
+Cleaner playbooks
+Easier testing and collaboration
+Works well with Ansible Galaxy for sharing
+
+
+Firstly make sure role path must be define in inventory file (hosts) path /etc/ansible/hosts file.
+
+To create role
+ansible-galaxy init <role-name>
+
+file structure of the role
+🗂️ Standard Role Directory Structure
+plaintext
+Copy
+Edit
+my_role/
+├── defaults/
+│   └── main.yml         # Default variables
+├── files/
+│   └── some_file.conf   # Static files to copy
+├── handlers/
+│   └── main.yml         # Handlers (used with 'notify')
+├── meta/
+│   └── main.yml         # Role dependencies and metadata
+├── tasks/
+│   └── main.yml         # Main list of tasks to run
+├── templates/
+│   └── config.j2        # Jinja2 templates
+├── tests/
+│   └── test.yml         # Test playbook
+├── vars/
+│   └── main.yml         # Variables with higher precedence
+
+
+eg. 
+ansible-galaxy init test
+[root@worker-01 test]# ls
+1  defaults  files  handlers  meta  README.md  tasks  templates  tests  vars
+[root@worker-01 test]# cat tasks/main.yml
+---
+# tasks file for test
+- name: "Install {{ package }}  package "
+  yum:
+    name: "{{ package }}"
+    state: installed
+- name: "Start and Enable {{ package }} service "
+  service:
+    name: "{{ package }}"
+    state: started
+    enabled: yes
+- name: "Copy source code"
+  copy:
+    src: index.html
+    dest: "{{ apache_documentroot }}"
+- name: "Add {{ package }} to the firewall Rule"
+  firewalld:
+    service: "{{ firewalld_service }}"
+    state: enabled
+    permanent: true
+    immediate: true
+    offline: true
+- name: "Add {{ package }} configuration setting"
+  template:
+    src: apache.j2
+    dest: "{{ apache_conf }}"
+  notify: restart_apache
+
+
+
+[root@worker-01 test]# cat vars/main.yml
+---
+# vars file for test
+
+package: httpd
+firewalld_service: http
+apache_documentroot: /var/www/html
+apache_conf: /etc/httpd/conf.d/
+
+[root@worker-01 test]# cat templates/apache.j2
+<VirtualHost {{ ansible_ens224.ipv4.address }}:80>
+    ServerName {{ ansible_fqdn }}
+    DocumentRoot {{ apache_documentroot }}
+</VirtualHost>
+
+[root@worker-01 test]# cat handlers/main.yml
+---
+# handlers file for test
+- name: restart_apache
+  service:
+    name: "{{ package }}"
+    state: restarted
+[root@worker-01 test]# cat files/index.html
+<!DOCTYPE html>
+          <html>
+          <head>
+              <title>Welcome to Apache HTTPD!</title>
+              <style>
+                  body { width: 50%; margin: 0 auto; font-family: Arial, sans-serif; }
+              </style>
+          </head>
+          <body>
+              <h1>Welcome to Apache HTTPD!</h1>
+              <p>If you see this page, the Apache web server is successfully installed and working. Further configuration is required.</p>
+              <p>For online documentation and support, please refer to <a href="http://httpd.apache.org/">httpd.apache.org</a>.</p>
+              <p>Commercial support is available at <a href="http://www.apache.org/">apache.org</a>.</p>
+              <p>Thank you for using Apache HTTPD.</p>
+          </body>
+          </html>
+
+[root@worker-01 test]# cat tests/test.yml
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - test
+
+[root@worker-01 test]# cat tests/inventory
+localhost
+
+ansible-playbook test.yaml 
+################################################################
