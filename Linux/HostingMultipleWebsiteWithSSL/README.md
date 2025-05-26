@@ -260,9 +260,9 @@ sudo systemctl restart httpd.service
 Finally, you can check the websites in your browser:
 
 * [https://www.gaurav.com](https://www.gaurav.com)
-  ![]()
+  ![www.gaurav.com](snap/www-gaurav-com.png)
 * [https://www.gaurav.net](https://www.gaurav.net)
-  ![]()
+  ![www.gaurav.net](snap/www-gaurav-net.png)
   
 Both should be accessible over HTTPS with the self-signed SSL certificates.
 
