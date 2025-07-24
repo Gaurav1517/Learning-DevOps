@@ -294,8 +294,29 @@ ansible sysops-server --list-hosts
 ansible harry-server --list-hosts
 ansible all --list-hosts
 
+OR 
+Just for a single normal user. 
+create both files ansible.cfg & username-host-inv-file at /home/username/
+and entry for ansible-host in ansible.cfg file 
+vim sysops-inv-host
+[sysops-server]
+192.168.70.134
+192.168.70.136
 
+vim  ansible.cfg
+[defaults]
+inventory = /home/sysops/sysops-inv-host
+remote_user = sysops  # Replace with your actual SSH username
+host_key_checking = False  # Optional, disable SSH key checking
 
+and for ansible.cfg file pass environment variable ~/.bashrc file like this 
+cat <<EOF >> ~/.bashrc
+
+# Exporting ansible .cfg file for harry user
+export ANSIBLE_CONFIG=/home/harry/ansible/ansible.cfg
+EOF
+
+#######################################################################################################
 HOW TO USE ANSIBLE COMMAND 
 
 Note: 
