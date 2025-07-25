@@ -448,6 +448,10 @@ id azure
 ansible web -m copy -a "src=/etc/group dest=/tmp owner=aws group=azure mode='0777'"
 # Verify 
 ansible web -m command -a "ls -l /tmp"
+for normal user comamnd
+ansible servers --become -m copy -a "src=/etc/group dest=/tmp owner=aws group=azure mode=0777"
+here -b tells Ansible to become root (run with privilege).
+Check :  ansible servers -m command -a "ls -la /tmp/group"
 
 
 # if we copy same file but append some text "Copy a new "/etc/group" file into place, backing
@@ -455,8 +459,9 @@ up the original if it differs from the copied version.
 Adding user Linux to make some changes in /etc/group file 
 useradd -m -s /bin/bash linux && echo "linux:password" | sudo chpasswd
 
+Backup of the file before it overwrite. 
 ansible web -m copy -a "src=/etc/group dest=/tmp owner=aws group=azure mode='0777' backup=yes"
-
+check
 ansible web -m command -a "ls -lh /tmp/group"
 
 # copy from target machine to target machine. 
