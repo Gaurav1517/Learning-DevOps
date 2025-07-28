@@ -1,0 +1,57 @@
+- name: Web server configuration on port 3000
+  hosts: servers
+  become: true
+  tasks:
+    - name: Install nginx
+      yum:
+        name: nginx
+        state: latest
+
+    - name: Start and enable nginx service
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Copy source code from controller to remote server
+      copy:
+        src: /home/sysops/project/  
+        dest: /usr/share/nginx/html/  
+        mode: '0755'  # Permissions (optional)
+
+    - name: Ensure nginx listens on port 3000
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^(\s*listen\s+)(\d+);'
+        line: '    listen       3000;'
+        backrefs: yes
+
+    - name: Change server_name to localhost
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^(\s*server_name\s+)(\S+);'
+        line: '    server_name  localhost;'
+        backrefs: yes
+
+    - name: Test nginx configuration
+      command: nginx -t
+      register: nginx_test_result  # Capture the output of the nginx -t command
+      ignore_errors: yes  # Continue even if the test fails
+
+    - name: Reload nginx if the configuration is valid
+      systemd:
+        name: nginx
+        state: reloaded
+      when: "'nginx: configuration file' in nginx_test_result.stderr"  # Use the correct output variable
+
+    - name: Add port 3000 to firewalld
+      firewalld:
+        port: 3000/tcp
+        permanent: yes
+        state: enabled
+      notify:
+        - Reload firewalld
+
+  handlers:
+    - name: Reload firewalld
+      command: firewall-cmd --reload
