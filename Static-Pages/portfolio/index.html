@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mark gaurav | Terminal Portfolio</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: monospace;
+      background-color: black;
+      color: #33ff33;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: #33ff33;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .navbar {
+      width: 100%;
+      background-color: #000;
+      color: white;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-bottom: 2px solid #33ff33;
+      display: flex;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 2px -2px #33ff33;
+    }
+
+    .commands {
+      color: white;
+      font-size: 0.9em;
+      flex: 1;
+      text-align: left;
+    }
+
+    .datetime {
+      font-size: 0.9em;
+      color: #33ff33;
+      text-align: right;
+    }
+
+    .content {
+      display: flex;
+      flex: 1;
+      height: 100%;
+    }
+
+    .left {
+      width: 50%;
+      background-color: #111;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+      border-right: 2px solid #33ff33;
+    }
+
+    .title-section {
+      margin-bottom: 10px;
+    }
+
+    .title {
+      font-weight: bold;
+      font-size: 1.4em;
+      color: #33ff33;
+    }
+
+    .subtitle {
+      font-size: 1em;
+      font-weight: bold;
+      color: #33ff33;
+    }
+
+    .image-box {
+      background-color: #222;
+      border: 2px solid #33ff33;
+      padding: 10px;
+      border-radius: 8px;
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 10px #33ff33;
+    }
+
+    .image-box img {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+
+    .about-section {
+      color: #ccc;
+      font-size: 0.9em;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .social-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.9em;
+    }
+
+    .right {
+      width: 50%;
+      background-color: black;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-commands-top {
+      color: white;
+      font-size: 0.85em;
+      padding: 10px 20px;
+      border-bottom: 1px solid #33ff33;
+      position: sticky;
+      top: 0;
+      background-color: black;
+      z-index: 999;
+    }
+
+    #terminal-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    #terminal {
+      white-space: pre-wrap;
+      color: white;
+    }
+
+    .prompt-line {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .prompt {
+      flex-shrink: 0;
+      color: #33ff33;
+    }
+
+    .input-field {
+      background: none;
+      border: none;
+      color: inherit;
+      font: inherit;
+      outline: none;
+      flex: 1;
+    }
+
+    .blinking-cursor::after {
+      content: '_';
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @media (max-width: 768px) {
+      .content {
+        flex-direction: column;
+      }
+
+      .left, .right {
+        width: 100%;
+        height: 50%;
+      }
+
+      .image-box img {
+        max-height: 200px;
+      }
+
+      .social-links {
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+
+    .nav-line {
+      border: none;
+      border-bottom: 2px solid #33ff33;
+      margin: 0;
+    }
+  </style>
+</head>
+<body tabindex="0">
+
+  <!-- Sticky navbar -->
+  <div class="navbar">
+    <div class="commands">help | about | projects | skills | experience | contact | education | certifications | leadership | sudo | clear</div>
+    <div class="datetime" id="datetime"></div>
+  </div>
+
+  <!-- Main content -->
+  <div class="content">
+
+    <!-- Left Side -->
+    <div class="left">
+      <div>
+        <div class="title-section">
+          <div class="title">Gaurav Chauhan</div>
+          <div class="subtitle">DevOps Engineer</div>
+        </div>
+        <div class="image-box">
+          <img src="https://images.unsplash.com/photo-1651924124013-67cb0fa6bb47?w=600&auto=format&fit=crop&q=60" alt="Mark gaurav">
+        </div>
+
+        <div class="about-section">
+          <p><strong>About Me:</strong></p>
+          <p>I'm Gaurav Chauhan, a DevOps and Software Engineer passionate about automation, cloud-native development, and AI integration. I build scalable solutions and engineer systems that run efficiently at scale.</p>
+        </div>
+      </div>
+
+      <div class="social-links">
+        <a href="https://linkedin.com/in/your-profile" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/your-github" target="_blank">GitHub</a> |
+        <a href="mailto:your.email@example.com">Gmail</a> |
+        <a href="https://yourportfolio.com" target="_blank">Portfolio</a> |
+        <a href="https://drive.google.com/file/d/your-id/view?usp=sharing" target="_blank" download>Resume</a>
+      </div>
+    </div>
+
+    <!-- Right Side -->
+    <div class="right">
+      <div class="terminal-commands-top">
+        &gt; help | about | projects | skills | experience | contact | education | certifications | leadership | sudo | clear
+      </div>
+      <div id="terminal-container">
+        <div id="terminal">
+          <div>Hi, I'm Gaurav Chauhan, a Software & AI Engineer.</div>
+          <div>Welcome to my interactive 'AI powered' portfolio terminal!</div>
+          <div>Type 'help' to see available commands.</div>
+        </div>
+
+        <div class="prompt-line">
+          <span class="prompt">gaurav@portfolio:~$ </span>
+          <input type="text" class="input-field blinking-cursor" id="input" autofocus />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+   // Disable Right-Click (Context Menu)
+document.addEventListener("contextmenu", function(e) {
+    e.preventDefault(); // Prevent the context menu from showing
+});
+
+// Disable F12 (Developer Tools Shortcut)
+document.addEventListener("keydown", function(e) {
+    // Block F12 or Ctrl+Shift+I
+    if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === "I")) {
+        e.preventDefault(); // Prevent Developer Tools shortcut
+    }
+
+    // Block Ctrl+U (View Source)
+    if (e.ctrlKey && e.key === "u") {
+        e.preventDefault(); // Prevent Ctrl+U
+    }
+
+    // Block Ctrl+Shift+I (DevTools shortcut) also
+    if (e.ctrlKey && e.shiftKey && e.key === "I") {
+        e.preventDefault(); // Prevent Ctrl+Shift+I
+    }
+});
+
+// Block Ctrl+Shift+J (Open Developer Console)
+document.addEventListener("keydown", function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key === "J") {
+        e.preventDefault(); // Block the Developer Tools console (Ctrl+Shift+J)
+    }
+});
+
+// Block Ctrl+P (Print Shortcut)
+document.addEventListener("keydown", function(e) {
+    if (e.ctrlKey && e.key === "p") {
+        e.preventDefault(); // Prevent Ctrl+P (Print)
+    }
+});
+
+
+    const terminal = document.getElementById("terminal");
+    const input = document.getElementById("input");
+    const terminalContainer = document.getElementById("terminal-container");
+
+    const prompt = "gaurav@portfolio:~$ ";
+    const commands = {
+      help: `Available commands:
+- about
+- projects
+- skills
+- experience
+- contact
+- education
+- certifications
+- leadership
+- sudo
+- clear`,
+      about: "I'm Mark gaurav, a Software & AI Engineer solving real-world problems with code and intelligence.",
+      projects: "- AI Chatbot\n- Data Pipeline\n- Terminal Portfolio\n- Computer Vision Toolkit",
+      skills: "Languages: Python, JavaScript, TypeScript\nTools: TensorFlow, Docker, Git, OpenCV",
+      experience: "- AI Engineer @ TechCorp (2023–2025)\n- Full Stack Dev @ DevStudio (2021–2023)",
+      contact: "Email: gaurav.cloud000@gmail.com\nGitHub: github.com/gaurav1517\nLinkedIn: /in/gaurav1517",
+      education: "BSc in Computer Science, University of Nairobi",
+      certifications: "- AWS ML Specialist\n- TensorFlow Dev Cert",
+      leadership: "Led 5-person AI team | Hackathon mentor & speaker",
+      sudo: "Permission denied: You are not root.",
+      clear: "CLEAR"
+    };
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        const command = input.value.trim().toLowerCase();
+        const line = document.createElement("div");
+        line.textContent = prompt + command;
+        terminal.appendChild(line);
+
+        if (commands[command]) {
+          if (commands[command] === "CLEAR") {
+            terminal.innerHTML = '';
+          } else {
+            simulateTyping(commands[command]);
+          }
+        } else {
+          simulateTyping(`Command not found: ${command}`);
+        }
+
+        input.value = "";
+        scrollToBottom();
+      }
+    });
+
+    function simulateTyping(text, speed = 10) {
+      let i = 0;
+      const output = document.createElement("div");
+      terminal.appendChild(output);
+
+      function typeChar() {
+        if (i < text.length) {
+          output.textContent += text[i++];
+          setTimeout(typeChar, speed);
+          scrollToBottom();
+        }
+      }
+
+      typeChar();
+    }
+
+    function scrollToBottom() {
+      terminalContainer.scrollTop = terminalContainer.scrollHeight;
+    }
+
+    document.body.addEventListener("click", () => input.focus());
+    document.body.addEventListener("keydown", () => input.focus());
+
+    function updateTime() {
+      const now = new Date();
+      const formatted = now.toLocaleString();
+      document.getElementById('datetime').textContent = formatted;
+    }
+
+    setInterval(updateTime, 1000);
+    updateTime();
+  </script>
+</body>
+</html>
